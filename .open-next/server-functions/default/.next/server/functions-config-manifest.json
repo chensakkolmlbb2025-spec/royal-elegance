@@ -1,0 +1,8 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/payments/debug": {},
+    "/api/payments/create-intent": {},
+    "/api/payments/self-test": {}
+  }
+}
