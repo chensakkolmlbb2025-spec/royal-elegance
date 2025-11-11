@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "next build",
+  "build": "next build && npx open-next build",
     "dev": "next dev",
   "cf:build": "npx open-next build",
   "cf:deploy": "npm run cf:build && npx wrangler pages deploy .open-next --project-name=$CF_PAGES_PROJECT --branch=main",
