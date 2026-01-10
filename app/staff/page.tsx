@@ -38,6 +38,7 @@ import { BookingCleanupProvider } from "@/components/system/booking-cleanup-prov
 import { BookingList } from "@/components/dashboard/booking-list"
 import { RoomStatusOverview } from "@/components/dashboard/room-status-overview"
 import { BookingCalendar } from "@/components/admin/booking-calendar"
+import { BookingManagement } from "@/components/admin/booking-management"
 
 // --- 1. Custom Hook for Data Logic ---
 const useStaffData = (user: SupabaseUser | null) => {
@@ -419,15 +420,7 @@ export default function StaffPage() {
               )}
 
               {activeTab === 'bookings' && (
-                <Card className="border-slate-200 shadow-sm">
-                  <CardHeader>
-                    <CardTitle>All Bookings</CardTitle>
-                    <CardDescription>Manage and modify guest reservations</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <BookingList bookings={bookings} rooms={rooms} />
-                  </CardContent>
-                </Card>
+                <BookingManagement />
               )}
 
               {activeTab === 'calendar' && (
