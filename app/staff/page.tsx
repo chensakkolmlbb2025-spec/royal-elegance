@@ -16,8 +16,7 @@ import {
   LogOut, 
   Menu, 
   Plus, 
-  QrCode, 
-  Search,
+  QrCode,
   CheckCircle2,
   Clock,
   AlertCircle,
@@ -25,11 +24,9 @@ import {
 } from "lucide-react"
 
 // UI Components
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import Loading from "@/components/ui/loading"
@@ -244,11 +241,10 @@ export default function StaffPage() {
 
       <div className="p-4 border-t border-slate-100">
         <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-50 mb-3">
-          <Avatar className="h-10 w-10 border border-white shadow-sm">
-            <AvatarImage src="" />
-            <AvatarFallback className="bg-primary/10 text-primary">ST</AvatarFallback>
-          </Avatar>
-          <div className="overflow-hidden">
+          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <span className="text-xs font-bold text-primary">ST</span>
+          </div>
+          <div className="overflow-hidden flex-1">
             <p className="text-sm font-medium truncate">{user.email?.split('@')[0]}</p>
             <p className="text-xs text-slate-500">Staff Member</p>
           </div>
@@ -276,10 +272,10 @@ export default function StaffPage() {
       </aside>
 
       {/* Main Content Area */}
-  <main className="flex-1 xl:pl-64 flex flex-col min-h-screen">
+      <main className="flex-1 xl:pl-64 flex flex-col min-h-screen">
         
-  {/* Mobile / Tablet Header */}
-  <header className="xl:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-20">
+        {/* Mobile / Tablet Header */}
+        <header className="xl:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-20">
           <span className="font-bold text-lg">StaffPortal</span>
           <Sheet open={isSidebarOpen} onOpenChange={setIsSidebarOpen}>
             <SheetTrigger asChild>
@@ -294,7 +290,7 @@ export default function StaffPage() {
         {/* Content Wrapper */}
         <div className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full space-y-8">
           
-          {/* Top Bar: Greetings & Context */}
+          {/* Top Bar: Page Title */}
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
               <h2 className="text-3xl font-bold text-slate-900">
@@ -304,24 +300,19 @@ export default function StaffPage() {
                 {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}
               </p>
             </div>
-            {/* Global Search - Optional enhancement */}
-            <div className="relative hidden md:block w-64">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <Input placeholder="Search guest or room..." className="pl-9 bg-white border-slate-200 focus-visible:ring-primary" />
-            </div>
           </div>
 
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-  <AnimatePresence>
-
-          {/* --- DASHBOARD TAB --- */}
-          <TabsContent key="dashboard" value="dashboard" className="space-y-8 focus-visible:outline-none">
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }} 
-                  animate={{ opacity: 1, y: 0 }} 
-                  transition={{ duration: 0.3 }}
-                  className="space-y-8"
-                >
+          {/* Render Active Tab with Animation */}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={activeTab}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+            >
+              {activeTab === 'dashboard' && (
+                <div className="space-y-8">
                   {/* Quick Actions Toolbar */}
                   <section>
                     <h3 className="text-sm font-semibold text-slate-900 mb-3 flex items-center gap-2">
@@ -378,28 +369,27 @@ export default function StaffPage() {
                         <CardDescription>Latest reservations requiring attention</CardDescription>
                       </CardHeader>
                       <CardContent className="p-0">
-                         {/* Passing props to your existing BookingList to ensure it fits the container */}
-                         <div className="max-h-[500px] overflow-auto">
-                            <BookingList limit={5} bookings={bookings} rooms={rooms} />
-                         </div>
+                        <div className="max-h-[500px] overflow-auto">
+                          <BookingList limit={5} bookings={bookings} rooms={rooms} />
+                        </div>
                       </CardContent>
                     </Card>
 
                     <div className="space-y-6">
                       <Card className="border-slate-200 shadow-sm h-fit">
-                         <CardHeader className="pb-3">
-                           <CardTitle className="text-lg">Room Status</CardTitle>
-                         </CardHeader>
-                         <CardContent>
-                           <RoomStatusOverview />
-                         </CardContent>
+                        <CardHeader className="pb-3">
+                          <CardTitle className="text-lg">Room Status</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <RoomStatusOverview />
+                        </CardContent>
                       </Card>
                       
-                      {/* Staff Notice Board (Static placeholder for UI) */}
+                      {/* Staff Notice Board */}
                       <Card className="bg-gradient-to-br from-slate-900 to-slate-800 text-white border-0 shadow-md">
                         <CardHeader>
                           <CardTitle className="text-base flex items-center gap-2">
-                             <AlertCircle className="w-4 h-4 text-amber-400" /> Shift Notice
+                            <AlertCircle className="w-4 h-4 text-amber-400" /> Shift Notice
                           </CardTitle>
                         </CardHeader>
                         <CardContent className="text-sm text-slate-300">
@@ -408,37 +398,30 @@ export default function StaffPage() {
                       </Card>
                     </div>
                   </div>
-                </motion.div>
-              </TabsContent>
+                </div>
+              )}
 
-              {/* --- BOOKINGS TAB --- */}
-              <TabsContent key="bookings" value="bookings" className="focus-visible:outline-none">
-                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                  <Card className="border-slate-200 shadow-sm">
-                    <CardHeader>
-                      <CardTitle>All Bookings</CardTitle>
-                      <CardDescription>Manage and modify guest reservations</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <BookingList bookings={bookings} rooms={rooms} />
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              </TabsContent>
+              {activeTab === 'bookings' && (
+                <Card className="border-slate-200 shadow-sm">
+                  <CardHeader>
+                    <CardTitle>All Bookings</CardTitle>
+                    <CardDescription>Manage and modify guest reservations</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <BookingList bookings={bookings} rooms={rooms} />
+                  </CardContent>
+                </Card>
+              )}
 
-              {/* --- CALENDAR TAB --- */}
-              <TabsContent key="calendar" value="calendar" className="focus-visible:outline-none">
-                <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }}>
-                  <Card className="border-slate-200 shadow-sm">
-                    <CardContent className="pt-6">
-                      <BookingCalendar />
-                    </CardContent>
-                  </Card>
-                </motion.div>
-              </TabsContent>
-
-            </AnimatePresence>
-          </Tabs>
+              {activeTab === 'calendar' && (
+                <Card className="border-slate-200 shadow-sm">
+                  <CardContent className="pt-6">
+                    <BookingCalendar />
+                  </CardContent>
+                </Card>
+              )}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </main>
     </div>

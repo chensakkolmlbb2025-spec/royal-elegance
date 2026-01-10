@@ -22,7 +22,8 @@ import {
   DollarSign,
   TrendingUp,
   Activity,
-  Menu
+  Menu,
+  LogOut
 } from "lucide-react"
 
 // UI Components
@@ -245,10 +246,10 @@ export default function AdminPage() {
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
+            className="space-y-8"
           >
             {/* Stats Grid */}
-            <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            <section className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
               <StatsCard
                 title="Total Bookings"
                 value={stats.totalBookings}
@@ -275,37 +276,47 @@ export default function AdminPage() {
                 value={`${stats.occupancyRate}%`}
                 description="Current status"
                 icon={Activity}
-                trend={{ value: 2, isPositive: true }} // Example trend
+                trend={{ value: 2, isPositive: true }}
               />
-            </div>
+            </section>
 
-            {/* Charts Section */}
-            <div className="grid gap-6 lg:grid-cols-3">
-              <Card className="lg:col-span-2 border-border/50 shadow-sm">
-                <CardHeader>
-                  <CardTitle>Revenue Overview</CardTitle>
+            {/* Main Split View */}
+            <div className="grid gap-8 lg:grid-cols-3">
+              <Card className="lg:col-span-2 border-slate-200 shadow-sm overflow-hidden">
+                <CardHeader className="bg-white border-b border-slate-100 pb-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg">Revenue Overview</CardTitle>
+                  </div>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="pt-6">
                   <RevenueChart />
                 </CardContent>
               </Card>
-              <Card className="lg:col-span-1 border-border/50 shadow-sm">
-                <CardHeader>
-                  <CardTitle>Room Status</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <RoomStatusOverview />
-                </CardContent>
-              </Card>
+
+              <div className="space-y-6">
+                <Card className="border-slate-200 shadow-sm h-fit">
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg">Room Status</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <RoomStatusOverview />
+                  </CardContent>
+                </Card>
+              </div>
             </div>
 
             {/* Recent Bookings */}
-            <Card className="border-border/50 shadow-sm">
-              <CardHeader>
-                <CardTitle>Recent Bookings</CardTitle>
+            <Card className="border-slate-200 shadow-sm overflow-hidden">
+              <CardHeader className="bg-white border-b border-slate-100 pb-4">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg">Recent Bookings</CardTitle>
+                  <Button variant="ghost" size="sm" className="text-primary">View All</Button>
+                </div>
               </CardHeader>
-              <CardContent>
-                <BookingList limit={5} bookings={bookings} rooms={rooms} />
+              <CardContent className="p-0">
+                <div className="max-h-[500px] overflow-auto">
+                  <BookingList limit={5} bookings={bookings} rooms={rooms} />
+                </div>
               </CardContent>
             </Card>
           </motion.div>
@@ -323,140 +334,111 @@ export default function AdminPage() {
     }
   }
 
+  // Sidebar Content Component
+  const SidebarContent = () => (
+    <div className="flex flex-col h-full">
+      <div className="p-6">
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+          Admin<span className="text-primary">Panel</span>
+        </h1>
+        <p className="text-xs text-slate-500 mt-1 uppercase tracking-wider">Management Center</p>
+      </div>
+      
+      <ScrollArea className="flex-1 px-4">
+        <nav className="space-y-2 pb-4">
+          {MENU_ITEMS.map((item) => {
+            const Icon = item.icon
+            const isActive = activeTab === item.value
+            return (
+              <Button
+                key={item.value}
+                variant={isActive ? "secondary" : "ghost"}
+                className="w-full justify-start gap-3 h-12 text-base font-normal"
+                onClick={() => { setActiveTab(item.value); setIsMobileMenuOpen(false) }}
+              >
+                <Icon className="w-5 h-5" />
+                {item.label}
+              </Button>
+            )
+          })}
+        </nav>
+      </ScrollArea>
+
+      <div className="p-4 border-t border-slate-100">
+        <div className="flex items-center gap-3 p-2 rounded-lg bg-slate-50 mb-3">
+          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <span className="text-xs font-bold text-primary">AD</span>
+          </div>
+          <div className="overflow-hidden flex-1">
+            <p className="text-sm font-medium truncate">{user?.email?.split('@')[0]}</p>
+            <p className="text-xs text-slate-500">Administrator</p>
+          </div>
+        </div>
+        <Button 
+          variant="ghost" 
+          className="w-full justify-start gap-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+          onClick={handleSignOut}
+        >
+          <LogOut className="w-4 h-4" /> Sign Out
+        </Button>
+      </div>
+    </div>
+  )
+
   return (
-    <div className="min-h-screen bg-slate-50/50 dark:bg-zinc-950 flex">
-      {/* 
-        ---------------------------
-        DESKTOP SIDEBAR 
-        ---------------------------
-      */}
-  <aside className="hidden xl:flex w-64 flex-col fixed inset-y-0 z-50 border-r border-border/40 bg-background/80 backdrop-blur-xl">
-        <div className="p-6">
-          <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-violet-600 bg-clip-text text-transparent">
-            AdminPanel
-          </h2>
-        </div>
-        <ScrollArea className="flex-1 px-4">
-          <nav className="space-y-1 pb-4">
-            {MENU_ITEMS.map((item) => {
-              const Icon = item.icon
-              const isActive = activeTab === item.value
-              return (
-                <button
-                  key={item.value}
-                  onClick={() => setActiveTab(item.value)}
-                  className={`flex w-full items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 group
-                    ${isActive 
-                      ? "bg-primary/10 text-primary shadow-sm" 
-                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
-                    }`}
-                >
-                  <Icon className={`w-4 h-4 transition-colors ${isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground"}`} />
-                  {item.label}
-                  {isActive && (
-                    <motion.div
-                      layoutId="active-pill"
-                      className="ml-auto w-1.5 h-1.5 rounded-full bg-primary"
-                    />
-                  )}
-                </button>
-              )
-            })}
-          </nav>
-        </ScrollArea>
-        <div className="p-4 border-t border-border/40">
-           <div className="flex items-center gap-3 px-2">
-             <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary">
-               AD
-             </div>
-             <div className="text-xs flex-1">
-               <p className="font-medium text-foreground">Admin User</p>
-               <p className="text-muted-foreground truncate max-w-[120px]">{user?.email}</p>
-             </div>
-             <div>
-               <button
-                 onClick={handleSignOut}
-                 className="text-xs text-slate-600 hover:text-foreground transition-colors px-2 py-1 rounded"
-               >
-                 Sign out
-               </button>
-             </div>
-           </div>
-        </div>
+    <div className="min-h-screen bg-slate-50/80 flex font-sans text-slate-900">
+      {/* Desktop Sidebar */}
+      <aside className="hidden xl:block w-64 bg-white border-r border-slate-200 fixed inset-y-0 z-30">
+        <SidebarContent />
       </aside>
 
-      {/* 
-        ---------------------------
-        MAIN CONTENT AREA 
-        ---------------------------
-      */}
-  <main className="flex-1 xl:pl-64">
-  {/* Mobile / Tablet Header - show whenever sidebar is hidden (below xl) */}
-  <div className="xl:hidden flex items-center justify-between p-4 border-b bg-background/80 backdrop-blur-md sticky top-0 z-40">
+      {/* Main Content Area */}
+      <main className="flex-1 xl:pl-64 flex flex-col min-h-screen">
+        
+        {/* Mobile / Tablet Header */}
+        <header className="xl:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-20">
           <span className="font-bold text-lg">AdminPanel</span>
           <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon"><Menu className="w-5 h-5" /></Button>
+              <Button variant="ghost" size="icon"><Menu className="w-6 h-6" /></Button>
             </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-0">
-              <div className="p-6 text-xl font-bold">Menu</div>
-              <div className="px-4 space-y-1">
-                 {MENU_ITEMS.map((item) => (
-                   <Button
-                     key={item.value}
-                     variant={activeTab === item.value ? "secondary" : "ghost"}
-                     className="w-full justify-start gap-2 mb-1"
-                     onClick={() => {
-                       setActiveTab(item.value)
-                       setIsMobileMenuOpen(false)
-                     }}
-                   >
-                     <item.icon className="w-4 h-4" />
-                     {item.label}
-                   </Button>
-                 ))}
-                </div>
-                <div className="px-4 mt-4 border-t border-border/40 pt-3">
-                  <Button variant="ghost" className="w-full justify-start" onClick={() => { setIsMobileMenuOpen(false); handleSignOut(); }}>
-                    Sign out
-                  </Button>
-              </div>
+            <SheetContent side="left" className="p-0 w-64 border-r-0">
+              <SidebarContent />
             </SheetContent>
           </Sheet>
-        </div>
+        </header>
 
         {/* Content Wrapper */}
-        <div className="container max-w-7xl mx-auto px-4 py-8 lg:p-8 space-y-8">
+        <div className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full space-y-8">
           
-          {/* Page Header */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          {/* Top Bar: Page Title & Actions */}
+          <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
-              <h1 className="text-3xl font-bold tracking-tight text-foreground">
-                {MENU_ITEMS.find(i => i.value === activeTab)?.label}
-              </h1>
-              <p className="text-muted-foreground mt-1">
+              <h2 className="text-3xl font-bold text-slate-900">
+                {MENU_ITEMS.find(i => i.value === activeTab)?.label || 'Overview'}
+              </h2>
+              <p className="text-slate-500 mt-1">
                 {activeTab === 'dashboard' 
-                  ? `Welcome back, ${user?.email?.split('@')[0]}` 
+                  ? new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })
                   : `Manage your ${activeTab.replace('-', ' ')} settings here.`}
               </p>
             </div>
             
-            <div className="flex items-center gap-2">
-              <SeedDatabaseButton />
-              {/* Add more global actions here like 'Export' */}
-            </div>
+            {activeTab === 'dashboard' && (
+              <div className="flex items-center gap-2">
+                <SeedDatabaseButton />
+              </div>
+            )}
           </div>
 
-          <Separator className="bg-border/60" />
-
           {/* Render Active Tab with Animation */}
-          <AnimatePresence>
+          <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
-              initial={{ opacity: 0, x: -10 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 10 }}
-              transition={{ duration: 0.2 }}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
             >
               {renderContent()}
             </motion.div>
