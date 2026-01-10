@@ -59,6 +59,10 @@ const useStaffData = (user: SupabaseUser | null) => {
         const convertedBookings = bookingsData.map((booking: any) => ({
           ...booking,
           id: booking.id,
+          roomId: booking.room_id,
+          roomTypeId: booking.room_type_id,
+          userId: booking.user_id,
+          bookingReference: booking.booking_reference,
           createdAt: new Date(booking.created_at),
           updatedAt: new Date(booking.updated_at),
           checkInDate: new Date(booking.check_in_date),
@@ -67,8 +71,17 @@ const useStaffData = (user: SupabaseUser | null) => {
           checkOut: new Date(booking.check_out_date),
           status: booking.status,
           totalPrice: booking.total_price,
+          roomPrice: booking.room_price,
+          servicesPrice: booking.services_price || 0,
           guestName: booking.guest_name,
-          // Map other fields as necessary based on your Type definition
+          guestEmail: booking.guest_email,
+          guestPhone: booking.guest_phone,
+          guestCount: booking.guest_count || 1,
+          guests: booking.guest_count || 1, // Add guests field for compatibility
+          paymentStatus: booking.payment_status,
+          paymentMethod: booking.payment_method,
+          specialRequests: booking.special_requests,
+          internalNotes: booking.internal_notes,
         })) as Booking[]
 
         const roomsData = await getRooms()

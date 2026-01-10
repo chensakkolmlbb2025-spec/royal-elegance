@@ -231,6 +231,10 @@ export function BookingList({ limit, showActions = true, bookings: propBookings,
               displayBookings.map((booking) => {
                 const room = rooms.find((r) => r.id === booking.roomId)
                 const roomType = roomTypes.find((rt) => rt.id === room?.roomTypeId)
+                
+                // Handle both field name variations (checkIn/checkInDate)
+                const checkInDate = booking.checkIn || booking.checkInDate
+                const checkOutDate = booking.checkOut || booking.checkOutDate
 
                 return (
                   <TableRow key={booking.id}>
@@ -241,8 +245,8 @@ export function BookingList({ limit, showActions = true, bookings: propBookings,
                         <div className="text-xs text-muted-foreground">Room {room?.roomNumber || "N/A"}</div>
                       </div>
                     </TableCell>
-                    <TableCell>{new Date(booking.checkIn).toLocaleDateString()}</TableCell>
-                    <TableCell>{new Date(booking.checkOut).toLocaleDateString()}</TableCell>
+                    <TableCell>{checkInDate ? new Date(checkInDate).toLocaleDateString() : "N/A"}</TableCell>
+                    <TableCell>{checkOutDate ? new Date(checkOutDate).toLocaleDateString() : "N/A"}</TableCell>
                     <TableCell>{booking.guests}</TableCell>
                     <TableCell className="font-medium">${booking.totalPrice}</TableCell>
                     <TableCell>
