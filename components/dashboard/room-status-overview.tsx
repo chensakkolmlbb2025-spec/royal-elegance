@@ -3,20 +3,26 @@
 import { useEffect, useState } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { getRooms, getRoomTypes } from "@/lib/supabase-service"
-import type { Room, RoomType } from "@/lib/types"
+import { getRooms, getRoomTypes, getBookings } from "@/lib/supabase-service"
+import type { Room, RoomType, Booking } from "@/lib/types"
 
 export function RoomStatusOverview() {
   const [rooms, setRooms] = useState<Room[]>([])
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
+  const [bookings, setBookings] = useState<Booking[]>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [roomsData, roomTypesData] = await Promise.all([getRooms(), getRoomTypes()])
+        const [roomsData, roomTypesData, bookingsData] = await Promise.all([
+          getRooms(), 
+          getRoomTypes(),
+          getBookings()
+        ])
         setRooms(roomsData)
         setRoomTypes(roomTypesData)
+        setBookings(bookingsData)
       } catch (error) {
         console.error("Error fetching room status data:", error)
       } finally {
@@ -26,9 +32,56 @@ export function RoomStatusOverview() {
     fetchData()
   }, [])
 
+  // Calculate actual room status based on current bookings
+  const calculateRoomStatus = (room: Room) => {
+    const now = new Date()
+    now.setHours(0, 0, 0, 0) // Start of today
+    
+    // Check if room has a current active booking
+    const activeBooking = bookings.find((booking) => {
+      if (booking.roomId !== room.id) return false
+      if (booking.status === "cancelled") return false
+      
+      const checkIn = new Date(booking.checkIn || booking.checkInDate)
+      const checkOut = new Date(booking.checkOut || booking.checkOutDate)
+      checkIn.setHours(0, 0, 0, 0)
+      checkOut.setHours(0, 0, 0, 0)
+      
+      // Guest is currently staying (checked in and not yet checked out)
+      if (booking.status === "confirmed" && checkIn <= now && checkOut > now) {
+        return true
+      }
+      
+      return false
+    })
+
+    // Check for future reservations (reserved status)
+    const futureReservation = bookings.find((booking) => {
+      if (booking.roomId !== room.id) return false
+      if (booking.status === "cancelled") return false
+      
+      const checkIn = new Date(booking.checkIn || booking.checkInDate)
+      checkIn.setHours(0, 0, 0, 0)
+      
+      // Has a confirmed booking in the future
+      if ((booking.status === "confirmed" || booking.status === "reserved") && checkIn > now) {
+        return true
+      }
+      
+      return false
+    })
+
+    // Priority: maintenance > occupied > reserved > available
+    if (room.status === "maintenance") return "maintenance"
+    if (activeBooking) return "occupied"
+    if (futureReservation) return "reserved"
+    return "available"
+  }
+
   const statusCounts = rooms.reduce(
     (acc, room) => {
-      acc[room.status] = (acc[room.status] || 0) + 1
+      const actualStatus = calculateRoomStatus(room)
+      acc[actualStatus] = (acc[actualStatus] || 0) + 1
       return acc
     },
     {} as Record<string, number>,
@@ -63,12 +116,12 @@ export function RoomStatusOverview() {
     <Card className="glass-card border-0 animate-fade-in-up animation-delay-400">
       <CardHeader className="bg-gradient-to-br from-white/95 to-background-accent/20">
         <CardTitle className="font-display text-slate-900">Room Status</CardTitle>
-        <CardDescription>Current status of all rooms</CardDescription>
+        <CardDescription>Real-time status based on current bookings</CardDescription>
       </CardHeader>
       <CardContent className="bg-white/95">
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
-            {Object.entries(statusCounts).map(([status, count], index) => (
+            {Object.entries(statusCounts).sort((a, b) => b[1] - a[1]).map(([status, count], index) => (
               <div 
                 key={status} 
                 className="glass-button p-4 rounded-lg animate-fade-in-scale"
@@ -89,6 +142,10 @@ export function RoomStatusOverview() {
             <div className="flex justify-between text-sm mt-2">
               <span className="text-muted-foreground">Room Types</span>
               <span className="font-semibold">{roomTypes.length}</span>
+            </div>
+            <div className="flex justify-between text-sm mt-2">
+              <span className="text-muted-foreground">Active Bookings</span>
+              <span className="font-semibold">{bookings.filter(b => b.status !== 'cancelled').length}</span>
             </div>
           </div>
         </div>

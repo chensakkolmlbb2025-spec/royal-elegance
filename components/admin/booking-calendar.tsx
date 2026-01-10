@@ -66,9 +66,11 @@ export function BookingCalendar() {
       if (selectedRoomId !== "all" && booking.roomId !== selectedRoomId) return false
       if (booking.status === "cancelled") return false
 
-      const checkIn = new Date(booking.checkIn)
-      const checkOut = new Date(booking.checkOut)
+      // Handle both checkIn/checkOut and checkInDate/checkOutDate field names
+      const checkIn = new Date(booking.checkIn || booking.checkInDate)
+      const checkOut = new Date(booking.checkOut || booking.checkOutDate)
 
+      // Check if the booking overlaps with this day
       return date < checkOut && nextDay > checkIn
     })
   }
