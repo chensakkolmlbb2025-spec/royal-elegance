@@ -24,7 +24,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import type { Booking, Room, RoomType, Service } from "@/lib/types"
-import { getRooms, getRoomTypes, getServices, updateBooking } from "@/lib/supabase-service"
+import { getRooms, getRoomTypes, getServices, updateBooking, checkInBooking, checkOutBooking, markBookingNoShow } from "@/lib/supabase-service"
 import { 
   Calendar, 
   Hotel, 
@@ -36,9 +36,21 @@ import {
   Clock,
   ChevronUp,
   ChevronDown,
-  MapPin
+  MapPin,
+  LogIn,
+  LogOut,
+  UserX,
+  BedDouble
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 
 // Helper: format currency consistently
 const formatCurrency = (amount: number) => {
@@ -55,14 +67,16 @@ const StatusBadge = ({ status }: { status: string }) => {
     confirmed: "bg-emerald-50 text-emerald-700 border-emerald-200",
     pending: "bg-amber-50 text-amber-700 border-amber-200",
     cancelled: "bg-red-50 text-red-700 border-red-200",
+    checked_in: "bg-blue-50 text-blue-700 border-blue-200",
     checked_out: "bg-slate-100 text-slate-700 border-slate-200",
-    no_show: "bg-slate-100 text-slate-700 border-slate-200",
+    no_show: "bg-orange-50 text-orange-700 border-orange-200",
   }
   
   const labels = {
     confirmed: "Confirmed",
     pending: "Pending Confirmation",
     cancelled: "Cancelled",
+    checked_in: "Currently Staying",
     checked_out: "Completed",
     no_show: "No Show",
   }
@@ -105,6 +119,14 @@ export default function BookingsPage() {
   const [services, setServices] = useState<Service[]>([])
   const [loadingData, setLoadingData] = useState(true)
   const [expandedBookings, setExpandedBookings] = useState<Set<string>>(new Set())
+  
+  // Action dialog states
+  const [actionDialog, setActionDialog] = useState<{
+    open: boolean
+    type: 'check_in' | 'check_out' | 'no_show' | null
+    booking: Booking | null
+  }>({ open: false, type: null, booking: null })
+  const [actionLoading, setActionLoading] = useState(false)
 
   // Toggle helper
   const toggleBookingDetails = (bookingId: string) => {
@@ -179,6 +201,8 @@ export default function BookingsPage() {
         checkOut: new Date(booking.check_out_date),
         checkInDate: new Date(booking.check_in_date), // Keep for type compatibility
         checkOutDate: new Date(booking.check_out_date),
+        actualCheckInAt: booking.actual_check_in_at ? new Date(booking.actual_check_in_at) : null,
+        actualCheckOutAt: booking.actual_check_out_at ? new Date(booking.actual_check_out_at) : null,
         floorId: booking.floor_id,
         roomTypeId: booking.room_type_id,
         roomId: booking.room_id,
@@ -186,6 +210,11 @@ export default function BookingsPage() {
         bookingType: booking.room_id && (bookingServicesMap[booking.id] || []).length > 0 ? 'both' : (booking.room_id ? 'room' : 'service'),
         totalPrice: booking.total_price,
         status: booking.status,
+        guestName: booking.guest_name,
+        guestCount: booking.guest_count,
+        guests: booking.guest_count,
+        bookingReference: booking.booking_reference,
+        paymentStatus: booking.payment_status,
       })) as Booking[]
 
       const [allRooms, allRoomTypes, allServices] = await Promise.all([
@@ -252,9 +281,117 @@ export default function BookingsPage() {
     return services.filter((s) => booking.services.includes(s.id))
   }
 
-  const upcomingBookings = bookings.filter(b => b.status !== "cancelled" && new Date(b.checkOut).setHours(0,0,0,0) >= new Date().setHours(0,0,0,0))
-  const pastBookings = bookings.filter(b => b.status !== "cancelled" && new Date(b.checkOut).setHours(0,0,0,0) < new Date().setHours(0,0,0,0))
+  // Helper to check if booking's check-in date has passed
+  const isCheckInDatePassed = (booking: Booking) => {
+    const now = new Date()
+    now.setHours(0, 0, 0, 0)
+    const checkIn = new Date(booking.checkIn)
+    checkIn.setHours(0, 0, 0, 0)
+    return checkIn <= now
+  }
+
+  // Helper to check if booking's check-out date has passed
+  const isCheckOutDatePassed = (booking: Booking) => {
+    const now = new Date()
+    now.setHours(0, 0, 0, 0)
+    const checkOut = new Date(booking.checkOut)
+    checkOut.setHours(0, 0, 0, 0)
+    return checkOut < now
+  }
+
+  // Filter bookings by status for proper categorization
+  // Upcoming: Future bookings that are confirmed/pending and check-in date hasn't passed
+  const upcomingBookings = bookings.filter(b => 
+    (b.status === "confirmed" || b.status === "pending") && !isCheckInDatePassed(b)
+  )
+  
+  // Staying: Bookings where guest is currently checked in
+  const stayingBookings = bookings.filter(b => b.status === "checked_in")
+  
+  // No Show: Explicitly marked as no_show OR past check-in date without check-in (staff oversight)
+  const noShowBookings = bookings.filter(b => {
+    // Explicitly marked as no_show
+    if (b.status === "no_show") return true
+    // Past check-in/check-out dates without any status update (still pending/confirmed)
+    if ((b.status === "confirmed" || b.status === "pending") && isCheckOutDatePassed(b)) {
+      return true
+    }
+    return false
+  })
+  
+  // History: Completed bookings (checked out)
+  const historyBookings = bookings.filter(b => b.status === "checked_out")
+  
+  // Cancelled: Cancelled bookings
   const cancelledBookings = bookings.filter(b => b.status === "cancelled")
+
+  // Action handlers
+  const handleCheckIn = async (booking: Booking) => {
+    setActionLoading(true)
+    try {
+      const updatedBooking = await checkInBooking(booking.id)
+      setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, ...updatedBooking, status: "checked_in" } : b))
+      toast({
+        title: "Check-in Successful",
+        description: `${booking.guestName || 'Guest'} has been checked in.`,
+      })
+      setActionDialog({ open: false, type: null, booking: null })
+    } catch (error) {
+      toast({
+        title: "Check-in Failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleCheckOut = async (booking: Booking) => {
+    setActionLoading(true)
+    try {
+      const updatedBooking = await checkOutBooking(booking.id)
+      setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, ...updatedBooking, status: "checked_out" } : b))
+      toast({
+        title: "Check-out Successful",
+        description: `${booking.guestName || 'Guest'} has been checked out.`,
+      })
+      setActionDialog({ open: false, type: null, booking: null })
+    } catch (error) {
+      toast({
+        title: "Check-out Failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const handleMarkNoShow = async (booking: Booking) => {
+    setActionLoading(true)
+    try {
+      const updatedBooking = await markBookingNoShow(booking.id)
+      setBookings(prev => prev.map(b => b.id === booking.id ? { ...b, ...updatedBooking, status: "no_show" } : b))
+      toast({
+        title: "Marked as No Show",
+        description: `Booking ${booking.bookingReference} has been marked as no show.`,
+      })
+      setActionDialog({ open: false, type: null, booking: null })
+    } catch (error) {
+      toast({
+        title: "Action Failed",
+        description: error instanceof Error ? error.message : "Please try again.",
+        variant: "destructive",
+      })
+    } finally {
+      setActionLoading(false)
+    }
+  }
+
+  const openActionDialog = (type: 'check_in' | 'check_out' | 'no_show', booking: Booking) => {
+    setActionDialog({ open: true, type, booking })
+  }
 
   // Show inline loading state while fetching data
   if (loadingData) {
@@ -294,14 +431,22 @@ export default function BookingsPage() {
 
         {/* Booking Tabs */}
         <Tabs defaultValue="upcoming" className="w-full">
-          <TabsList className="w-full sm:w-auto grid grid-cols-3 sm:inline-flex h-10 items-center justify-center rounded-md bg-slate-100 p-1 text-slate-500">
-            <TabsTrigger value="upcoming" className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">
+          <TabsList className="w-full sm:w-auto grid grid-cols-5 sm:inline-flex h-10 items-center justify-center rounded-md bg-slate-100 p-1 text-slate-500">
+            <TabsTrigger value="upcoming" className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm text-xs sm:text-sm">
               Upcoming ({upcomingBookings.length})
             </TabsTrigger>
-            <TabsTrigger value="history" className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">
-              History ({pastBookings.length})
+            <TabsTrigger value="staying" className="data-[state=active]:bg-white data-[state=active]:text-blue-600 data-[state=active]:shadow-sm text-xs sm:text-sm">
+              <BedDouble className="w-3 h-3 mr-1 hidden sm:inline" />
+              Staying ({stayingBookings.length})
             </TabsTrigger>
-            <TabsTrigger value="cancelled" className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm">
+            <TabsTrigger value="no_show" className="data-[state=active]:bg-white data-[state=active]:text-orange-600 data-[state=active]:shadow-sm text-xs sm:text-sm">
+              <UserX className="w-3 h-3 mr-1 hidden sm:inline" />
+              No Show ({noShowBookings.length})
+            </TabsTrigger>
+            <TabsTrigger value="history" className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm text-xs sm:text-sm">
+              History ({historyBookings.length})
+            </TabsTrigger>
+            <TabsTrigger value="cancelled" className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm text-xs sm:text-sm">
               Cancelled ({cancelledBookings.length})
             </TabsTrigger>
           </TabsList>
@@ -327,7 +472,57 @@ export default function BookingsPage() {
                     isExpanded={expandedBookings.has(booking.id)}
                     onToggle={() => toggleBookingDetails(booking.id)}
                     onCancel={() => handleCancelBooking(booking.id)}
+                    onCheckIn={() => openActionDialog('check_in', booking)}
+                    onMarkNoShow={() => openActionDialog('no_show', booking)}
                     type="upcoming"
+                    isCheckInDatePassed={isCheckInDatePassed(booking)}
+                  />
+                ))
+              )}
+            </TabsContent>
+
+            {/* STAYING CONTENT */}
+            <TabsContent value="staying" className="space-y-4">
+              {stayingBookings.length === 0 ? (
+                <EmptyState 
+                  icon={BedDouble} 
+                  title="No guests currently staying" 
+                  description="There are no guests currently checked in."
+                />
+              ) : (
+                stayingBookings.map(booking => (
+                  <BookingCard 
+                    key={booking.id} 
+                    booking={booking} 
+                    roomType={getRoomTypeForBooking(booking)}
+                    bookingServices={getServicesForBooking(booking)}
+                    isExpanded={expandedBookings.has(booking.id)}
+                    onToggle={() => toggleBookingDetails(booking.id)}
+                    onCheckOut={() => openActionDialog('check_out', booking)}
+                    type="staying"
+                  />
+                ))
+              )}
+            </TabsContent>
+
+            {/* NO SHOW CONTENT */}
+            <TabsContent value="no_show" className="space-y-4">
+              {noShowBookings.length === 0 ? (
+                <EmptyState 
+                  icon={UserX} 
+                  title="No missed bookings" 
+                  description="Great! All guests have shown up for their reservations."
+                />
+              ) : (
+                noShowBookings.map(booking => (
+                  <BookingCard 
+                    key={booking.id} 
+                    booking={booking} 
+                    roomType={getRoomTypeForBooking(booking)}
+                    bookingServices={getServicesForBooking(booking)}
+                    isExpanded={expandedBookings.has(booking.id)}
+                    onToggle={() => toggleBookingDetails(booking.id)}
+                    type="no_show"
                   />
                 ))
               )}
@@ -335,14 +530,14 @@ export default function BookingsPage() {
 
             {/* HISTORY CONTENT */}
             <TabsContent value="history" className="space-y-4">
-              {pastBookings.length === 0 ? (
+              {historyBookings.length === 0 ? (
                 <EmptyState 
                   icon={Clock} 
                   title="No booking history" 
                   description="Your past stays will appear here after you check out."
                 />
               ) : (
-                pastBookings.map(booking => (
+                historyBookings.map(booking => (
                   <BookingCard 
                     key={booking.id} 
                     booking={booking} 
@@ -380,6 +575,78 @@ export default function BookingsPage() {
             </TabsContent>
           </div>
         </Tabs>
+
+        {/* Action Dialog for Check-in/Check-out/No-show */}
+        <Dialog open={actionDialog.open} onOpenChange={(open) => !open && setActionDialog({ open: false, type: null, booking: null })}>
+          <DialogContent className="sm:max-w-[425px]">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                {actionDialog.type === 'check_in' && <><LogIn className="w-5 h-5 text-green-600" /> Confirm Check-in</>}
+                {actionDialog.type === 'check_out' && <><LogOut className="w-5 h-5 text-blue-600" /> Confirm Check-out</>}
+                {actionDialog.type === 'no_show' && <><UserX className="w-5 h-5 text-orange-600" /> Mark as No Show</>}
+              </DialogTitle>
+              <DialogDescription>
+                {actionDialog.type === 'check_in' && (
+                  <>Are you sure you want to check in <strong>{actionDialog.booking?.guestName}</strong> for booking <strong>#{actionDialog.booking?.bookingReference}</strong>?</>
+                )}
+                {actionDialog.type === 'check_out' && (
+                  <>Are you sure you want to check out <strong>{actionDialog.booking?.guestName}</strong> from booking <strong>#{actionDialog.booking?.bookingReference}</strong>?</>
+                )}
+                {actionDialog.type === 'no_show' && (
+                  <>This will mark booking <strong>#{actionDialog.booking?.bookingReference}</strong> as a no-show. This action indicates the guest did not arrive.</>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            {actionDialog.booking && (
+              <div className="py-4">
+                <div className="bg-slate-50 rounded-lg p-4 space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Guest Name</span>
+                    <span className="font-medium">{actionDialog.booking.guestName || 'N/A'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Check-in Date</span>
+                    <span className="font-medium">{formatDate(new Date(actionDialog.booking.checkIn), true)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Check-out Date</span>
+                    <span className="font-medium">{formatDate(new Date(actionDialog.booking.checkOut), true)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Total Amount</span>
+                    <span className="font-medium">{formatCurrency(actionDialog.booking.totalPrice)}</span>
+                  </div>
+                </div>
+              </div>
+            )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setActionDialog({ open: false, type: null, booking: null })} disabled={actionLoading}>
+                Cancel
+              </Button>
+              <Button 
+                onClick={() => {
+                  if (!actionDialog.booking) return
+                  if (actionDialog.type === 'check_in') handleCheckIn(actionDialog.booking)
+                  else if (actionDialog.type === 'check_out') handleCheckOut(actionDialog.booking)
+                  else if (actionDialog.type === 'no_show') handleMarkNoShow(actionDialog.booking)
+                }}
+                disabled={actionLoading}
+                className={
+                  actionDialog.type === 'check_in' ? 'bg-green-600 hover:bg-green-700' :
+                  actionDialog.type === 'check_out' ? 'bg-blue-600 hover:bg-blue-700' :
+                  'bg-orange-600 hover:bg-orange-700'
+                }
+              >
+                {actionLoading ? (
+                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                ) : null}
+                {actionDialog.type === 'check_in' && 'Check In'}
+                {actionDialog.type === 'check_out' && 'Check Out'}
+                {actionDialog.type === 'no_show' && 'Mark No Show'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
       
       {/* FIX: Footer inside the flex container */}
@@ -416,29 +683,44 @@ interface BookingCardProps {
   isExpanded: boolean
   onToggle: () => void
   onCancel?: () => void
-  type: "upcoming" | "history" | "cancelled"
+  onCheckIn?: () => void
+  onCheckOut?: () => void
+  onMarkNoShow?: () => void
+  type: "upcoming" | "staying" | "history" | "cancelled" | "no_show"
+  isCheckInDatePassed?: boolean
 }
 
-function BookingCard({ booking, roomType, bookingServices, isExpanded, onToggle, onCancel, type }: BookingCardProps) {
+function BookingCard({ booking, roomType, bookingServices, isExpanded, onToggle, onCancel, onCheckIn, onCheckOut, onMarkNoShow, type, isCheckInDatePassed }: BookingCardProps) {
   const checkIn = new Date(booking.checkIn)
   const checkOut = new Date(booking.checkOut)
   const nights = Math.max(1, Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)))
   const mainTitle = roomType ? roomType.name : bookingServices[0]?.name || "Service Booking"
   const isCancelled = type === "cancelled"
+  const isNoShow = type === "no_show"
+  const isStaying = type === "staying"
 
   return (
     <Card 
       className={`
         overflow-hidden transition-all duration-200 border-gray-200 
         ${isExpanded ? 'shadow-md ring-1 ring-indigo-500/10' : 'shadow-sm hover:shadow-md hover:border-indigo-200'}
-        ${isCancelled ? 'opacity-75 bg-slate-50' : 'bg-white'}
+        ${isCancelled ? 'opacity-75 bg-slate-50' : ''}
+        ${isNoShow ? 'opacity-80 bg-orange-50/30 border-orange-200' : ''}
+        ${isStaying ? 'bg-blue-50/20 border-blue-200' : 'bg-white'}
       `}
     >
       <div className="p-5 cursor-pointer" onClick={onToggle}>
         <div className="flex flex-col md:flex-row gap-6 md:items-center justify-between">
           <div className="flex items-start gap-4 flex-1">
-            <div className={`p-3 rounded-xl flex-shrink-0 ${isCancelled ? 'bg-red-50 text-red-500' : 'bg-indigo-50 text-indigo-600'}`}>
-              {booking.bookingType === 'room' ? <Hotel className="w-6 h-6" /> : <Sparkles className="w-6 h-6" />}
+            <div className={`p-3 rounded-xl flex-shrink-0 ${
+              isCancelled ? 'bg-red-50 text-red-500' : 
+              isNoShow ? 'bg-orange-50 text-orange-500' :
+              isStaying ? 'bg-blue-50 text-blue-600' :
+              'bg-indigo-50 text-indigo-600'
+            }`}>
+              {isStaying ? <BedDouble className="w-6 h-6" /> : 
+               isNoShow ? <UserX className="w-6 h-6" /> :
+               booking.bookingType === 'room' ? <Hotel className="w-6 h-6" /> : <Sparkles className="w-6 h-6" />}
             </div>
             
             <div className="space-y-1">
@@ -573,25 +855,60 @@ function BookingCard({ booking, roomType, bookingServices, isExpanded, onToggle,
             <Button variant="outline" className="w-full sm:w-auto text-slate-600 border-slate-200">
               <MapPin className="w-4 h-4 mr-2" /> Get Directions
             </Button>
+            
+            {/* Upcoming booking actions */}
             {type === "upcoming" && booking.status === "confirmed" && (
-              <AlertDialog>
-                <AlertDialogTrigger asChild>
-                  <Button variant="ghost" className="w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50">Cancel Booking</Button>
-                </AlertDialogTrigger>
-                <AlertDialogContent className="bg-white border-gray-200">
-                  <AlertDialogHeader>
-                    <AlertDialogTitle className="flex items-center gap-2 text-red-600"><AlertCircle className="w-5 h-5" /> Cancel Reservation?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      Are you sure you want to cancel booking <strong>{booking.bookingReference}</strong>? This action cannot be undone.
-                    </AlertDialogDescription>
-                  </AlertDialogHeader>
-                  <AlertDialogFooter>
-                    <AlertDialogCancel className="border-gray-200">Keep Reservation</AlertDialogCancel>
-                    <AlertDialogAction onClick={onCancel} className="bg-red-600 hover:bg-red-700 text-white border-none">Yes, Cancel</AlertDialogAction>
-                  </AlertDialogFooter>
-                </AlertDialogContent>
-              </AlertDialog>
+              <>
+                {/* Show Check-in button if check-in date has passed */}
+                {isCheckInDatePassed && onCheckIn && (
+                  <Button 
+                    onClick={onCheckIn}
+                    className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    <LogIn className="w-4 h-4 mr-2" /> Check In
+                  </Button>
+                )}
+                {/* Show Mark No Show button if check-in date has passed */}
+                {isCheckInDatePassed && onMarkNoShow && (
+                  <Button 
+                    variant="outline"
+                    onClick={onMarkNoShow}
+                    className="w-full sm:w-auto text-orange-600 border-orange-200 hover:bg-orange-50"
+                  >
+                    <UserX className="w-4 h-4 mr-2" /> Mark No Show
+                  </Button>
+                )}
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="ghost" className="w-full sm:w-auto text-red-600 hover:text-red-700 hover:bg-red-50">Cancel Booking</Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="bg-white border-gray-200">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle className="flex items-center gap-2 text-red-600"><AlertCircle className="w-5 h-5" /> Cancel Reservation?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        Are you sure you want to cancel booking <strong>{booking.bookingReference}</strong>? This action cannot be undone.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel className="border-gray-200">Keep Reservation</AlertDialogCancel>
+                      <AlertDialogAction onClick={onCancel} className="bg-red-600 hover:bg-red-700 text-white border-none">Yes, Cancel</AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
             )}
+            
+            {/* Staying booking actions */}
+            {type === "staying" && onCheckOut && (
+              <Button 
+                onClick={onCheckOut}
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <LogOut className="w-4 h-4 mr-2" /> Check Out
+              </Button>
+            )}
+            
+            {/* History booking actions */}
             {type === "history" && (
                <Button className="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white">Book Again</Button>
             )}

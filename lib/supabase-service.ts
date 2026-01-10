@@ -691,5 +691,109 @@ export const deleteBooking = async (id: string): Promise<void> => {
   if (error) throw error
 }
 
+// Check-in a booking
+export const checkInBooking = async (id: string, staffId?: string): Promise<Booking> => {
+  const client = (typeof window !== 'undefined' ? createBrowserClient() : undefined) || supabase
+  if (!client) throw new Error("Supabase client not initialized")
+
+  const now = new Date().toISOString()
+
+  const { data, error } = await client
+    .from("bookings")
+    .update({
+      status: "checked_in",
+      actual_check_in_at: now,
+      checked_in_by: staffId || null,
+    })
+    .eq("id", id)
+    .select()
+
+  if (error) throw new Error(`Check-in failed: ${error.message}`)
+  if (!data || data.length === 0) throw new Error("Check-in failed: Booking not found or not authorized")
+
+  // Log activity
+  try {
+    await client.from("activity_logs").insert({
+      user_id: staffId || null,
+      action: "check_in",
+      entity_type: "booking",
+      entity_id: id,
+      details: { checked_in_at: now },
+    })
+  } catch (logError) {
+    console.warn("Failed to log check-in activity:", logError)
+  }
+
+  return convertTimestamps(data[0]) as Booking
+}
+
+// Check-out a booking
+export const checkOutBooking = async (id: string, staffId?: string): Promise<Booking> => {
+  const client = (typeof window !== 'undefined' ? createBrowserClient() : undefined) || supabase
+  if (!client) throw new Error("Supabase client not initialized")
+
+  const now = new Date().toISOString()
+
+  const { data, error } = await client
+    .from("bookings")
+    .update({
+      status: "checked_out",
+      actual_check_out_at: now,
+      checked_out_by: staffId || null,
+    })
+    .eq("id", id)
+    .select()
+
+  if (error) throw new Error(`Check-out failed: ${error.message}`)
+  if (!data || data.length === 0) throw new Error("Check-out failed: Booking not found or not authorized")
+
+  // Log activity
+  try {
+    await client.from("activity_logs").insert({
+      user_id: staffId || null,
+      action: "check_out",
+      entity_type: "booking",
+      entity_id: id,
+      details: { checked_out_at: now },
+    })
+  } catch (logError) {
+    console.warn("Failed to log check-out activity:", logError)
+  }
+
+  return convertTimestamps(data[0]) as Booking
+}
+
+// Mark booking as no-show
+export const markBookingNoShow = async (id: string, staffId?: string): Promise<Booking> => {
+  const client = (typeof window !== 'undefined' ? createBrowserClient() : undefined) || supabase
+  if (!client) throw new Error("Supabase client not initialized")
+
+  const { data, error } = await client
+    .from("bookings")
+    .update({
+      status: "no_show",
+    })
+    .eq("id", id)
+    .select()
+
+  if (error) throw new Error(`Mark no-show failed: ${error.message}`)
+  if (!data || data.length === 0) throw new Error("Mark no-show failed: Booking not found or not authorized")
+
+  // Log activity
+  try {
+    await client.from("activity_logs").insert({
+      user_id: staffId || null,
+      action: "no_show",
+      entity_type: "booking",
+      entity_id: id,
+      details: { marked_at: new Date().toISOString() },
+    })
+  } catch (logError) {
+    console.warn("Failed to log no-show activity:", logError)
+  }
+
+  return convertTimestamps(data[0]) as Booking
+}
+
 // Removed initializeDatabase: mock-data.ts does not exist and is not used in production
 
