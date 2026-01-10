@@ -18,6 +18,9 @@ export interface RoomType {
   maxOccupancy: number
   amenities: string[]
   images: string[]
+  bedType?: string // Type of bed (e.g., "King", "Queen", "Twin")
+  roomSize?: number // Room size in square meters
+  features?: Record<string, any> // Additional features stored as JSONB
   createdAt: Date
 }
 

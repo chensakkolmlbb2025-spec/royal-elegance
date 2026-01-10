@@ -97,6 +97,14 @@ const convertTimestamps = (data: any) => {
     converted.maxOccupancy = converted.max_occupancy
     delete converted.max_occupancy
   }
+  if (converted.bed_type) {
+    converted.bedType = converted.bed_type
+    delete converted.bed_type
+  }
+  if (converted.room_size !== undefined) {
+    converted.roomSize = converted.room_size
+    delete converted.room_size
+  }
   if (converted.total_price) {
     converted.totalPrice = converted.total_price
     delete converted.total_price
@@ -200,6 +208,10 @@ const toSnakeCase = (data: any) => {
       converted.base_price = data[key]
     } else if (key === "maxOccupancy") {
       converted.max_occupancy = data[key]
+    } else if (key === "bedType") {
+      converted.bed_type = data[key]
+    } else if (key === "roomSize") {
+      converted.room_size = data[key]
     } else if (key === "totalPrice") {
       converted.total_price = data[key]
     } else if (key === "paymentStatus") {
