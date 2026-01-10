@@ -37,18 +37,35 @@ export function RoomStatusOverview() {
     const now = new Date()
     now.setHours(0, 0, 0, 0) // Start of today
     
+    // Helper function to safely convert to Date
+    const toDate = (date: any): Date | null => {
+      if (!date) return null
+      if (date instanceof Date) return date
+      try {
+        const d = new Date(date)
+        return isNaN(d.getTime()) ? null : d
+      } catch {
+        return null
+      }
+    }
+    
     // Check if room has a current active booking
     const activeBooking = bookings.find((booking) => {
       if (booking.roomId !== room.id) return false
       if (booking.status === "cancelled") return false
       
-      const checkIn = new Date(booking.checkIn || booking.checkInDate)
-      const checkOut = new Date(booking.checkOut || booking.checkOutDate)
-      checkIn.setHours(0, 0, 0, 0)
-      checkOut.setHours(0, 0, 0, 0)
+      const checkIn = toDate(booking.checkIn || booking.checkInDate)
+      const checkOut = toDate(booking.checkOut || booking.checkOutDate)
+      
+      if (!checkIn || !checkOut) return false
+      
+      const checkInDate = new Date(checkIn)
+      const checkOutDate = new Date(checkOut)
+      checkInDate.setHours(0, 0, 0, 0)
+      checkOutDate.setHours(0, 0, 0, 0)
       
       // Guest is currently staying (checked in and not yet checked out)
-      if (booking.status === "confirmed" && checkIn <= now && checkOut > now) {
+      if (booking.status === "confirmed" && checkInDate <= now && checkOutDate > now) {
         return true
       }
       
@@ -60,11 +77,14 @@ export function RoomStatusOverview() {
       if (booking.roomId !== room.id) return false
       if (booking.status === "cancelled") return false
       
-      const checkIn = new Date(booking.checkIn || booking.checkInDate)
-      checkIn.setHours(0, 0, 0, 0)
+      const checkIn = toDate(booking.checkIn || booking.checkInDate)
+      if (!checkIn) return false
       
-      // Has a confirmed booking in the future
-      if ((booking.status === "confirmed" || booking.status === "reserved") && checkIn > now) {
+      const checkInDate = new Date(checkIn)
+      checkInDate.setHours(0, 0, 0, 0)
+      
+      // Has a confirmed/pending booking in the future (reserved for future date)
+      if ((booking.status === "confirmed" || booking.status === "pending") && checkInDate > now) {
         return true
       }
       
