@@ -19,7 +19,6 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 import { useToast } from "@/hooks/use-toast"
-import Loading from "@/components/ui/loading"
 
 // Helper function to format currency
 const formatCurrency = (amount: number) => {
@@ -31,7 +30,6 @@ const formatCurrency = (amount: number) => {
 
 function BookingConfirmationContent() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [loading, setLoading] = useState(true)
   const router = useRouter()
   const searchParams = useSearchParams()
   const { toast } = useToast()
@@ -50,7 +48,6 @@ function BookingConfirmationContent() {
     supabase.auth.getUser().then(({ data }: { data: { user: SupabaseUser | null } }) => {
       const u = (data as any)?.user ?? null
       setUser(u)
-      setLoading(false)
       if (!u) router.push("/")
     })
     const { data } = supabase.auth.onAuthStateChange((_event: string, session: any) => {
@@ -206,7 +203,22 @@ function BookingConfirmationContent() {
     window.print()
   }
 
-  if (loading || loadingData) return <Loading message="Finalizing your reservation..." size="lg" />
+  // Show inline loading state while fetching data
+  if (loadingData) {
+    return (
+      <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-accent/5 to-background">
+        <PremiumNavbar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-slate-500 font-medium">Finalizing your reservation...</p>
+          </div>
+        </div>
+        <PremiumFooter />
+      </div>
+    )
+  }
+  
   if (!user) return null
 
   // Error State
@@ -484,7 +496,14 @@ function BookingConfirmationContent() {
 
 export default function BookingConfirmationPage() {
   return (
-    <Suspense fallback={<Loading message="Retrieving itinerary..." size="lg" />}>
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-accent/5 to-background">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+          <p className="text-sm text-slate-500 font-medium">Retrieving itinerary...</p>
+        </div>
+      </div>
+    }>
       <BookingConfirmationContent />
     </Suspense>
   )

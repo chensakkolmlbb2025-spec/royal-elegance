@@ -39,7 +39,6 @@ import {
   MapPin
 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
-import Loading from "@/components/ui/loading"
 
 // Helper: format currency consistently
 const formatCurrency = (amount: number) => {
@@ -96,7 +95,6 @@ const TypeBadge = ({ type }: { type: string }) => {
 
 export default function BookingsPage() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
-  const [loading, setLoading] = useState(true)
   const router = useRouter()
   const { toast } = useToast()
   const supabase = createClient()
@@ -126,7 +124,6 @@ export default function BookingsPage() {
         return
       }
       setUser(user)
-      setLoading(false)
     }
     getUser()
 
@@ -259,8 +256,20 @@ export default function BookingsPage() {
   const pastBookings = bookings.filter(b => b.status !== "cancelled" && new Date(b.checkOut).setHours(0,0,0,0) < new Date().setHours(0,0,0,0))
   const cancelledBookings = bookings.filter(b => b.status === "cancelled")
 
-  if (loading || loadingData) {
-    return <Loading message="Loading your reservations..." size="md" />
+  // Show inline loading state while fetching data
+  if (loadingData) {
+    return (
+      <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-accent/5 to-background">
+        <PremiumNavbar />
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+            <p className="text-sm text-slate-500 font-medium">Loading your reservations...</p>
+          </div>
+        </div>
+        <PremiumFooter />
+      </div>
+    )
   }
 
   return (
