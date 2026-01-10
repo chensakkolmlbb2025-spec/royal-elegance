@@ -34,6 +34,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import Loading from "@/components/ui/loading"
 
+// System Components
+import { BookingCleanupProvider } from "@/components/system/booking-cleanup-provider"
+
 // Custom Admin Components (Preserving your imports)
 // Optional if sidebar replaces this
 import { StatsCard } from "@/components/dashboard/stats-card"
@@ -386,25 +389,26 @@ export default function AdminPage() {
   )
 
   return (
-    <div className="min-h-screen bg-slate-50/80 flex font-sans text-slate-900">
-      {/* Desktop Sidebar */}
-      <aside className="hidden xl:block w-64 bg-white border-r border-slate-200 fixed inset-y-0 z-30">
-        <SidebarContent />
-      </aside>
+    <BookingCleanupProvider>
+      <div className="min-h-screen bg-slate-50/80 flex font-sans text-slate-900">
+        {/* Desktop Sidebar */}
+        <aside className="hidden xl:block w-64 bg-white border-r border-slate-200 fixed inset-y-0 z-30">
+          <SidebarContent />
+        </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 xl:pl-64 flex flex-col min-h-screen">
-        
-        {/* Mobile / Tablet Header */}
-        <header className="xl:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-20">
-          <span className="font-bold text-lg">AdminPanel</span>
-          <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon"><Menu className="w-6 h-6" /></Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-64 border-r-0">
-              <SidebarContent />
-            </SheetContent>
+        {/* Main Content Area */}
+        <main className="flex-1 xl:pl-64 flex flex-col min-h-screen">
+          
+          {/* Mobile / Tablet Header */}
+          <header className="xl:hidden bg-white border-b border-slate-200 p-4 flex items-center justify-between sticky top-0 z-20">
+            <span className="font-bold text-lg">AdminPanel</span>
+            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+              <SheetTrigger asChild>
+                <Button variant="ghost" size="icon"><Menu className="w-6 h-6" /></Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="p-0 w-64 border-r-0">
+                <SidebarContent />
+              </SheetContent>
           </Sheet>
         </header>
 
@@ -446,5 +450,6 @@ export default function AdminPage() {
         </div>
       </main>
     </div>
+    </BookingCleanupProvider>
   )
 }

@@ -687,6 +687,17 @@ export const updateBooking = async (id: string, booking: Partial<Booking>): Prom
   if (!data || data.length === 0) {
     throw new Error(`Cannot update booking: This booking may not belong to your account, may not be in a status that allows updates, or may not exist. Please check booking status and try again.`)
   }
+
+  // If booking is being cancelled or marked as no-show, update room status
+  if (booking.status === 'cancelled' || booking.status === 'no_show') {
+    if (data[0].room_id) {
+      try {
+        await updateRoomStatusToAvailable(data[0].room_id)
+      } catch (roomError) {
+        console.warn("Failed to update room status:", roomError)
+      }
+    }
+  }
   
   return convertTimestamps(data[0]) as Booking
 }
@@ -759,6 +770,15 @@ export const checkOutBooking = async (id: string, staffId?: string): Promise<Boo
   if (error) throw new Error(`Check-out failed: ${error.message}`)
   if (!data || data.length === 0) throw new Error("Check-out failed: Booking not found or not authorized")
 
+  // Update room status to available
+  if (data[0].room_id) {
+    try {
+      await updateRoomStatusToAvailable(data[0].room_id)
+    } catch (roomError) {
+      console.warn("Failed to update room status:", roomError)
+    }
+  }
+
   // Log activity
   try {
     await client.from("activity_logs").insert({
@@ -791,6 +811,15 @@ export const markBookingNoShow = async (id: string, staffId?: string): Promise<B
   if (error) throw new Error(`Mark no-show failed: ${error.message}`)
   if (!data || data.length === 0) throw new Error("Mark no-show failed: Booking not found or not authorized")
 
+  // Update room status to available
+  if (data[0].room_id) {
+    try {
+      await updateRoomStatusToAvailable(data[0].room_id)
+    } catch (roomError) {
+      console.warn("Failed to update room status:", roomError)
+    }
+  }
+
   // Log activity
   try {
     await client.from("activity_logs").insert({
@@ -805,6 +834,107 @@ export const markBookingNoShow = async (id: string, staffId?: string): Promise<B
   }
 
   return convertTimestamps(data[0]) as Booking
+}
+
+// Helper function to update room status to available
+const updateRoomStatusToAvailable = async (roomId: string): Promise<void> => {
+  const client = (typeof window !== 'undefined' ? createBrowserClient() : undefined) || supabase
+  if (!client) throw new Error("Supabase client not initialized")
+
+  await client
+    .from("rooms")
+    .update({ status: "available" })
+    .eq("id", roomId)
+}
+
+// Cancel a booking and free up the room
+export const cancelBooking = async (id: string, userId?: string): Promise<Booking> => {
+  const client = (typeof window !== 'undefined' ? createBrowserClient() : undefined) || supabase
+  if (!client) throw new Error("Supabase client not initialized")
+
+  const { data, error } = await client
+    .from("bookings")
+    .update({
+      status: "cancelled",
+    })
+    .eq("id", id)
+    .select()
+
+  if (error) throw new Error(`Cancel booking failed: ${error.message}`)
+  if (!data || data.length === 0) throw new Error("Cancel booking failed: Booking not found or not authorized")
+
+  // Update room status to available
+  if (data[0].room_id) {
+    try {
+      await updateRoomStatusToAvailable(data[0].room_id)
+    } catch (roomError) {
+      console.warn("Failed to update room status:", roomError)
+    }
+  }
+
+  // Log activity
+  try {
+    await client.from("activity_logs").insert({
+      user_id: userId || null,
+      action: "cancel_booking",
+      entity_type: "booking",
+      entity_id: id,
+      details: { cancelled_at: new Date().toISOString() },
+    })
+  } catch (logError) {
+    console.warn("Failed to log cancellation activity:", logError)
+  }
+
+  return convertTimestamps(data[0]) as Booking
+}
+
+// Clean up expired bookings - updates room status for past check-out dates
+export const cleanupExpiredBookings = async (): Promise<number> => {
+  const client = (typeof window !== 'undefined' ? createBrowserClient() : undefined) || supabase
+  if (!client) throw new Error("Supabase client not initialized")
+
+  const now = new Date().toISOString()
+
+  // Find all bookings where check-out date has passed and status is still pending or confirmed
+  const { data: expiredBookings, error: fetchError } = await client
+    .from("bookings")
+    .select("id, room_id, check_out_date")
+    .in("status", ["pending", "confirmed"])
+    .lt("check_out_date", now)
+    .not("room_id", "is", null)
+
+  if (fetchError) {
+    console.error("Failed to fetch expired bookings:", fetchError)
+    return 0
+  }
+
+  if (!expiredBookings || expiredBookings.length === 0) {
+    return 0
+  }
+
+  // Update each expired booking to no_show and free up the room
+  let updatedCount = 0
+  for (const booking of expiredBookings) {
+    try {
+      // Mark as no-show
+      await client
+        .from("bookings")
+        .update({ status: "no_show" })
+        .eq("id", booking.id)
+
+      // Free up the room
+      if (booking.room_id) {
+        await updateRoomStatusToAvailable(booking.room_id)
+      }
+
+      updatedCount++
+    } catch (error) {
+      console.warn(`Failed to cleanup booking ${booking.id}:`, error)
+    }
+  }
+
+  console.log(`Cleaned up ${updatedCount} expired bookings`)
+  return updatedCount
 }
 
 // Removed initializeDatabase: mock-data.ts does not exist and is not used in production
