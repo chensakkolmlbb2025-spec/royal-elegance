@@ -232,6 +232,25 @@ export function BookingList({ limit, showActions = true, bookings: propBookings,
                 const room = rooms.find((r) => r.id === booking.roomId)
                 const roomType = roomTypes.find((rt) => rt.id === room?.roomTypeId)
                 
+                // Debug logging
+                if (!room && booking.roomId) {
+                  console.log('Room not found for booking:', {
+                    bookingId: booking.id,
+                    roomId: booking.roomId,
+                    availableRoomIds: rooms.map(r => r.id),
+                    roomsCount: rooms.length
+                  })
+                }
+                
+                if (room && !roomType) {
+                  console.log('RoomType not found for room:', {
+                    roomId: room.id,
+                    roomTypeId: room.roomTypeId,
+                    availableRoomTypeIds: roomTypes.map(rt => rt.id),
+                    roomTypesCount: roomTypes.length
+                  })
+                }
+                
                 // Handle both field name variations (checkIn/checkInDate)
                 const checkInDate = booking.checkIn || booking.checkInDate
                 const checkOutDate = booking.checkOut || booking.checkOutDate
