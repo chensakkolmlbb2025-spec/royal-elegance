@@ -23,7 +23,8 @@ import {
   TrendingUp,
   Activity,
   Menu,
-  LogOut
+  LogOut,
+  ClipboardList
 } from "lucide-react"
 
 // UI Components
@@ -51,6 +52,7 @@ import { ServiceCategoryManagement } from "@/components/admin/service-category-m
 import { UserManagement } from "@/components/admin/user-management"
 import { RoomAvailabilityChecker } from "@/components/booking/room-availability-checker"
 import { BookingCalendar } from "@/components/admin/booking-calendar"
+import { BookingManagement } from "@/components/admin/booking-management"
 import { SeedDatabaseButton } from "@/components/admin/seed-database-button"
 
 // --- 1. Custom Hook for Logic Separation ---
@@ -132,6 +134,7 @@ const useAdminData = (user: SupabaseUser | null) => {
 // --- 2. Configuration ---
 const MENU_ITEMS = [
   { value: "dashboard", label: "Overview", icon: LayoutDashboard },
+  { value: "bookings", label: "Bookings", icon: ClipboardList },
   { value: "users", label: "User Management", icon: Users },
   { value: "floors", label: "Floors", icon: Layers },
   { value: "room-types", label: "Room Types", icon: BedDouble },
@@ -325,6 +328,7 @@ export default function AdminPage() {
           </motion.div>
         )
       // Map other tabs to components
+      case "bookings": return <BookingManagement />
       case "users": return <UserManagement />
       case "floors": return <FloorManagement />
       case "room-types": return <RoomTypeManagement />
