@@ -165,11 +165,7 @@ export default function RoomsPage() {
     setSelectedRoom(null)
   }
 
-
-  if (loadingRooms) {
-    return <Loading message="Loading rooms..." size="lg" />
-  }
-
+  // Always render the layout, show loading state in content only
   if (selectedRoomType && selectedRoom && user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background">
@@ -191,29 +187,35 @@ export default function RoomsPage() {
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background">
       <PremiumNavbar />
       <main className="container mx-auto px-4 py-8" style={{ marginTop: "112px" }}>
-        <div className="mb-8 text-center">
-          <h1 className="text-4xl font-display font-bold mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Our Rooms & Suites
-          </h1>
-          <p className="text-muted-foreground text-lg">Discover your perfect sanctuary</p>
-        </div>
-
-        <RoomFilters roomTypes={roomTypes} onFilterChange={handleFilterChange} />
-
-        {filteredRoomTypes.length === 0 ? (
-          <div className="text-center py-12 glass-card">
-            <p className="text-muted-foreground">No rooms match your criteria. Please adjust your filters.</p>
-          </div>
+        {loadingRooms ? (
+          <Loading message="Loading rooms..." variant="content" />
         ) : (
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {filteredRoomTypes.map((roomType) => (
-              <RoomCard
-                key={roomType.id}
-                roomType={roomType}
-                onBook={handleBookRoomType}
-              />
-            ))}
-          </div>
+          <>
+            <div className="mb-8 text-center">
+              <h1 className="text-4xl font-display font-bold mb-2 bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Our Rooms & Suites
+              </h1>
+              <p className="text-muted-foreground text-lg">Discover your perfect sanctuary</p>
+            </div>
+
+            <RoomFilters roomTypes={roomTypes} onFilterChange={handleFilterChange} />
+
+            {filteredRoomTypes.length === 0 ? (
+              <div className="text-center py-12 glass-card">
+                <p className="text-muted-foreground">No rooms match your criteria. Please adjust your filters.</p>
+              </div>
+            ) : (
+              <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+                {filteredRoomTypes.map((roomType) => (
+                  <RoomCard
+                    key={roomType.id}
+                    roomType={roomType}
+                    onBook={handleBookRoomType}
+                  />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </main>
       <PremiumFooter/>

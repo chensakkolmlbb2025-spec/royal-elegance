@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client"
 import type { User as SupabaseUser } from "@supabase/supabase-js"
 import { PremiumNavbar } from "@/components/layout/premium-navbar"
 import { PremiumFooter } from "@/components/layout/premium-footer"
+import Loading from "@/components/ui/loading"
 import { Card, CardContent } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Badge } from "@/components/ui/badge"
@@ -393,17 +394,12 @@ export default function BookingsPage() {
     setActionDialog({ open: true, type, booking })
   }
 
-  // Show inline loading state while fetching data
+  // Show inline loading state while fetching data - navbar/footer stay visible
   if (loadingData) {
     return (
       <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-accent/5 to-background">
         <PremiumNavbar />
-        <div className="flex-1 flex items-center justify-center">
-          <div className="flex flex-col items-center gap-4">
-            <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-            <p className="text-sm text-slate-500 font-medium">Loading your reservations...</p>
-          </div>
-        </div>
+        <Loading message="Loading your reservations..." variant="content" />
         <PremiumFooter />
       </div>
     )

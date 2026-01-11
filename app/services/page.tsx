@@ -108,46 +108,48 @@ export default function ServicesPage() {
     }).length
   }
 
-  if (loadingServices || loadingCategories) {
-    return <Loading message="Loading services..." size="lg" />
-  }
+  const isLoading = loadingServices || loadingCategories
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background">
       <PremiumNavbar />
       <main className="container mx-auto px-4 py-8 space-y-8" style={{ marginTop: "112px" }}>
-        {/* Header */}
-        <div className="text-center space-y-4">
-          <h1 className="text-4xl md:text-5xl font-display font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-            Luxury Services
-          </h1>
-          <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-            Enhance your stay with our premium services. From spa treatments to fine dining, we offer everything you
-            need for an unforgettable experience.
-          </p>
-        </div>
+        {isLoading ? (
+          <Loading message="Loading services..." variant="content" />
+        ) : (
+          <>
+            {/* Header */}
+            <div className="text-center space-y-4">
+              <h1 className="text-4xl md:text-5xl font-display font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
+                Luxury Services
+              </h1>
+              <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
+                Enhance your stay with our premium services. From spa treatments to fine dining, we offer everything you
+                need for an unforgettable experience.
+              </p>
+            </div>
 
-        {/* Category Filters */}
-        <div className="flex flex-wrap gap-3 justify-center">
-          <Button
-            variant={selectedCategory === null ? "default" : "outline"}
-            onClick={() => setSelectedCategory(null)}
-            className="glass hover:text-[#d4af37] hover:border-[#d4af37] focus:ring-[#d4af37]/30"
-          >
-            All Services
-            <Badge variant="secondary" className="ml-2">
-              {services.length}
-            </Badge>
-          </Button>
-          {categories.map((category) => {
-            const count = getCategoryCount(category.slug)
-            return (
+            {/* Category Filters */}
+            <div className="flex flex-wrap gap-3 justify-center">
               <Button
-                key={category.id}
-                variant={selectedCategory === category.slug ? "default" : "outline"}
-                onClick={() => setSelectedCategory(category.slug)}
+                variant={selectedCategory === null ? "default" : "outline"}
+                onClick={() => setSelectedCategory(null)}
                 className="glass hover:text-[#d4af37] hover:border-[#d4af37] focus:ring-[#d4af37]/30"
-                disabled={count === 0}
+              >
+                All Services
+                <Badge variant="secondary" className="ml-2">
+                  {services.length}
+                </Badge>
+              </Button>
+              {categories.map((category) => {
+                const count = getCategoryCount(category.slug)
+                return (
+                  <Button
+                    key={category.id}
+                    variant={selectedCategory === category.slug ? "default" : "outline"}
+                    onClick={() => setSelectedCategory(category.slug)}
+                    className="glass hover:text-[#d4af37] hover:border-[#d4af37] focus:ring-[#d4af37]/30"
+                    disabled={count === 0}
               >
                 <span className="mr-2">{category.icon || "📋"}</span>
                 {category.name}
@@ -156,40 +158,41 @@ export default function ServicesPage() {
                 </Badge>
               </Button>
             )
-          })}
-        </div>
+                })}
+            </div>
 
-        {/* Services Grid */}
-        {filteredServices.length === 0 ? (
-          <div className="text-center py-12 glass-card">
-            <Sparkles className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
-            <p className="text-muted-foreground text-lg">
-              {selectedCategory
-                ? `No ${categories.find((c) => c.slug === selectedCategory)?.name.toLowerCase()} services available at the moment.`
-                : "No services available at the moment."}
-            </p>
-          </div>
-        ) : (
-          <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
-            {filteredServices.map((service) => (
-              <ServiceCard key={service.id} service={service} onBook={handleBookService} />
-            ))}
-          </div>
+            {/* Services Grid */}
+            {filteredServices.length === 0 ? (
+              <div className="text-center py-12 glass-card">
+                <Sparkles className="w-16 h-16 mx-auto mb-4 text-muted-foreground" />
+                <p className="text-muted-foreground text-lg">
+                  {selectedCategory
+                    ? `No ${categories.find((c) => c.slug === selectedCategory)?.name.toLowerCase()} services available at the moment.`
+                    : "No services available at the moment."}
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+                {filteredServices.map((service) => (
+                  <ServiceCard key={service.id} service={service} onBook={handleBookService} />
+                ))}
+              </div>
+            )}
+
+            {/* Info Section */}
+            <div className="glass-card p-6 text-center space-y-2">
+              <h3 className="text-xl font-semibold">Need Help Choosing?</h3>
+              <p className="text-muted-foreground">
+                Our concierge team is available 24/7 to help you select the perfect services for your stay.
+              </p>
+              <Button variant="outline" className="mt-4">
+                Contact Concierge
+              </Button>
+            </div>
+          </>
         )}
-
-        {/* Info Section */}
-        <div className="glass-card p-6 text-center space-y-2">
-          <h3 className="text-xl font-semibold">Need Help Choosing?</h3>
-          <p className="text-muted-foreground">
-            Our concierge team is available 24/7 to help you select the perfect services for your stay.
-          </p>
-          <Button variant="outline" className="mt-4">
-            Contact Concierge
-          </Button>
-        </div>
       </main>
       <PremiumFooter />
     </div>
   )
 }
-
