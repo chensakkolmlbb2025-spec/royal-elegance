@@ -1,5 +1,5 @@
 import Loading from "@/components/ui/loading"
 
 export default function AuthLoading() {
-  return <Loading message="Authenticating..." />
+  return <Loading message="Authenticating..." variant="fullpage" />
 }

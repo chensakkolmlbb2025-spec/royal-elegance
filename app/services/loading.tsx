@@ -1,5 +1,13 @@
 import Loading from "@/components/ui/loading"
+import { PremiumNavbar } from "@/components/layout/premium-navbar"
+import { PremiumFooter } from "@/components/layout/premium-footer"
 
 export default function ServicesLoading() {
-  return <Loading message="Loading services..." withLayout />
+  return (
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-accent/5 to-background">
+      <PremiumNavbar />
+      <Loading message="Loading services..." variant="content" />
+      <PremiumFooter />
+    </div>
+  )
 }
