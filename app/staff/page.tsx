@@ -246,10 +246,21 @@ export default function StaffPage() {
 
   const { bookings, rooms, loading, stats } = useStaffData(user)
 
-  if (loading || !user) return <Loading message="Preparing staff workspace..." size="lg" />
+  // Memoize filtered bookings lists
+  const checkInEligibleBookings = useMemo(() => 
+    bookings.filter(b => b.status === "confirmed" || b.status === "pending"),
+    [bookings]
+  )
+
+  const checkOutEligibleBookings = useMemo(() => 
+    bookings.filter(b => b.status === "checked_in"),
+    [bookings]
+  )
 
   // Quick action handlers
   const handleCheckIn = async () => {
+    if (!user) return
+    
     if (!selectedBookingId) {
       toast({
         title: "Error",
@@ -279,6 +290,8 @@ export default function StaffPage() {
   }
 
   const handleCheckOut = async () => {
+    if (!user) return
+    
     if (!selectedBookingId) {
       toast({
         title: "Error",
@@ -308,6 +321,8 @@ export default function StaffPage() {
   }
 
   const handleScanPass = async () => {
+    if (!user) return
+    
     if (!scanCode) {
       toast({
         title: "Error",
@@ -358,15 +373,7 @@ export default function StaffPage() {
     }
   }
 
-  // Get confirmed/pending bookings for check-in
-  const checkInEligibleBookings = bookings.filter(b => 
-    b.status === "confirmed" || b.status === "pending"
-  )
-
-  // Get checked-in bookings for check-out
-  const checkOutEligibleBookings = bookings.filter(b => 
-    b.status === "checked_in"
-  )
+  if (loading || !user) return <Loading message="Preparing staff workspace..." size="lg" />
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
