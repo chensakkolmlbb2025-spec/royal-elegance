@@ -29,7 +29,24 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
+import { Label } from "@/components/ui/label"
 import Loading from "@/components/ui/loading"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { useToast } from "@/hooks/use-toast"
 
 // System Components
 import { BookingCleanupProvider } from "@/components/system/booking-cleanup-provider"
@@ -39,6 +56,8 @@ import { BookingList } from "@/components/dashboard/booking-list"
 import { RoomStatusOverview } from "@/components/dashboard/room-status-overview"
 import { BookingCalendar } from "@/components/admin/booking-calendar"
 import { BookingManagement } from "@/components/admin/booking-management"
+import { checkInBooking, checkOutBooking, getRoomTypes } from "@/lib/supabase-service"
+import type { RoomType } from "@/lib/types"
 
 // --- 1. Custom Hook for Data Logic ---
 const useStaffData = (user: SupabaseUser | null) => {
@@ -157,8 +176,14 @@ export default function StaffPage() {
   const [user, setUser] = useState<SupabaseUser | null>(null)
   const [activeTab, setActiveTab] = useState("dashboard")
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
+  const [checkInDialog, setCheckInDialog] = useState(false)
+  const [checkOutDialog, setCheckOutDialog] = useState(false)
+  const [scanDialog, setScanDialog] = useState(false)
+  const [selectedBookingId, setSelectedBookingId] = useState("")
+  const [scanCode, setScanCode] = useState("")
   const router = useRouter()
   const supabase = createClient()
+  const { toast } = useToast()
 
   // Auth Check
   useEffect(() => {
@@ -222,6 +247,126 @@ export default function StaffPage() {
   const { bookings, rooms, loading, stats } = useStaffData(user)
 
   if (loading || !user) return <Loading message="Preparing staff workspace..." size="lg" />
+
+  // Quick action handlers
+  const handleCheckIn = async () => {
+    if (!selectedBookingId) {
+      toast({
+        title: "Error",
+        description: "Please select a booking to check in",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      await checkInBooking(selectedBookingId, user.id)
+      toast({
+        title: "Success",
+        description: "Guest checked in successfully"
+      })
+      setCheckInDialog(false)
+      setSelectedBookingId("")
+      // Refresh data
+      window.location.reload()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to check in guest",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleCheckOut = async () => {
+    if (!selectedBookingId) {
+      toast({
+        title: "Error",
+        description: "Please select a booking to check out",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      await checkOutBooking(selectedBookingId, user.id)
+      toast({
+        title: "Success",
+        description: "Guest checked out successfully. Room is now available."
+      })
+      setCheckOutDialog(false)
+      setSelectedBookingId("")
+      // Refresh data
+      window.location.reload()
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to check out guest",
+        variant: "destructive"
+      })
+    }
+  }
+
+  const handleScanPass = async () => {
+    if (!scanCode) {
+      toast({
+        title: "Error",
+        description: "Please enter a booking reference",
+        variant: "destructive"
+      })
+      return
+    }
+
+    try {
+      // Find booking by reference
+      const booking = bookings.find(b => 
+        b.bookingReference?.toLowerCase() === scanCode.toLowerCase()
+      )
+
+      if (!booking) {
+        toast({
+          title: "Not Found",
+          description: "No booking found with this reference",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // Auto check-in if booking is confirmed
+      if (booking.status === "confirmed" || booking.status === "pending") {
+        await checkInBooking(booking.id, user.id)
+        toast({
+          title: "Success",
+          description: `Guest ${booking.guestName} checked in successfully`
+        })
+        setScanDialog(false)
+        setScanCode("")
+        window.location.reload()
+      } else {
+        toast({
+          title: "Cannot Check In",
+          description: `Booking status: ${booking.status}`,
+          variant: "destructive"
+        })
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to process scan",
+        variant: "destructive"
+      })
+    }
+  }
+
+  // Get confirmed/pending bookings for check-in
+  const checkInEligibleBookings = bookings.filter(b => 
+    b.status === "confirmed" || b.status === "pending"
+  )
+
+  // Get checked-in bookings for check-out
+  const checkOutEligibleBookings = bookings.filter(b => 
+    b.status === "checked_in"
+  )
 
   const SidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -338,9 +483,9 @@ export default function StaffPage() {
                     </h3>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                       <QuickActionButton icon={Plus} label="New Booking" onClick={() => setActiveTab('bookings')} />
-                      <QuickActionButton icon={CheckCircle2} label="Check-In" onClick={() => {}} />
-                      <QuickActionButton icon={LogOut} label="Check-Out" onClick={() => {}} />
-                      <QuickActionButton icon={QrCode} label="Scan Pass" onClick={() => {}} />
+                      <QuickActionButton icon={CheckCircle2} label="Check-In" onClick={() => setCheckInDialog(true)} />
+                      <QuickActionButton icon={LogOut} label="Check-Out" onClick={() => setCheckOutDialog(true)} />
+                      <QuickActionButton icon={QrCode} label="Scan Pass" onClick={() => setScanDialog(true)} />
                     </div>
                   </section>
 
@@ -434,6 +579,120 @@ export default function StaffPage() {
           </AnimatePresence>
         </div>
       </main>
+
+      {/* Check-In Dialog */}
+      <Dialog open={checkInDialog} onOpenChange={setCheckInDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Quick Check-In</DialogTitle>
+            <DialogDescription>
+              Select a booking to check in the guest
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Booking</Label>
+              <Select value={selectedBookingId} onValueChange={setSelectedBookingId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a booking..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {checkInEligibleBookings.length === 0 ? (
+                    <SelectItem value="none" disabled>No eligible bookings</SelectItem>
+                  ) : (
+                    checkInEligibleBookings.map(booking => (
+                      <SelectItem key={booking.id} value={booking.id}>
+                        {booking.guestName} - {booking.bookingReference} (Room {rooms.find(r => r.id === booking.roomId)?.roomNumber || 'N/A'})
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCheckInDialog(false)}>Cancel</Button>
+            <Button onClick={handleCheckIn} disabled={!selectedBookingId}>
+              <CheckCircle2 className="w-4 h-4 mr-2" />
+              Check In
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Check-Out Dialog */}
+      <Dialog open={checkOutDialog} onOpenChange={setCheckOutDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Quick Check-Out</DialogTitle>
+            <DialogDescription>
+              Select a booking to check out the guest
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Select Booking</Label>
+              <Select value={selectedBookingId} onValueChange={setSelectedBookingId}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Choose a booking..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {checkOutEligibleBookings.length === 0 ? (
+                    <SelectItem value="none" disabled>No checked-in guests</SelectItem>
+                  ) : (
+                    checkOutEligibleBookings.map(booking => (
+                      <SelectItem key={booking.id} value={booking.id}>
+                        {booking.guestName} - Room {rooms.find(r => r.id === booking.roomId)?.roomNumber || 'N/A'}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setCheckOutDialog(false)}>Cancel</Button>
+            <Button onClick={handleCheckOut} disabled={!selectedBookingId}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Check Out
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Scan Pass Dialog */}
+      <Dialog open={scanDialog} onOpenChange={setScanDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Scan Booking Pass</DialogTitle>
+            <DialogDescription>
+              Enter the booking reference code to quickly check in a guest
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label>Booking Reference</Label>
+              <Input 
+                placeholder="Enter booking reference (e.g., BK-12345)"
+                value={scanCode}
+                onChange={(e) => setScanCode(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleScanPass()}
+                className="font-mono uppercase"
+              />
+              <p className="text-xs text-slate-500">
+                Tip: Guests can find this on their confirmation email
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setScanDialog(false)}>Cancel</Button>
+            <Button onClick={handleScanPass} disabled={!scanCode}>
+              <QrCode className="w-4 h-4 mr-2" />
+              Process Check-In
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
     </BookingCleanupProvider>
   )
