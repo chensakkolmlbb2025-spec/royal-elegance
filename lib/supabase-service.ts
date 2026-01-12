@@ -294,7 +294,20 @@ export const deleteFloor = async (id: string): Promise<void> => {
     .delete()
     .eq("id", id)
   
-  if (error) throw error
+  if (error) {
+    // Detect FK/constraint errors - floor has rooms that must be deleted first
+    const errAny: any = error as any
+    const isFK =
+      errAny?.code === '23503' ||
+      (typeof errAny?.message === 'string' && errAny.message.toLowerCase().includes('foreign key')) ||
+      (typeof errAny?.details === 'string' && errAny.details.toLowerCase().includes('foreign key')) ||
+      (typeof errAny?.message === 'string' && errAny.message.toLowerCase().includes('violates foreign key'))
+
+    if (isFK) {
+      throw new Error("Cannot delete floor: There are rooms assigned to this floor. Please move or delete those rooms first.")
+    }
+    throw error
+  }
 }
 
 // Room Types
@@ -355,7 +368,20 @@ export const deleteRoomType = async (id: string): Promise<void> => {
     .delete()
     .eq("id", id)
   
-  if (error) throw error
+  if (error) {
+    // Detect FK/constraint errors - room type has rooms that must be deleted first
+    const errAny: any = error as any
+    const isFK =
+      errAny?.code === '23503' ||
+      (typeof errAny?.message === 'string' && errAny.message.toLowerCase().includes('foreign key')) ||
+      (typeof errAny?.details === 'string' && errAny.details.toLowerCase().includes('foreign key')) ||
+      (typeof errAny?.message === 'string' && errAny.message.toLowerCase().includes('violates foreign key'))
+
+    if (isFK) {
+      throw new Error("Cannot delete room type: There are rooms of this type. Please reassign or delete those rooms first.")
+    }
+    throw error
+  }
 }
 
 // Rooms
@@ -436,7 +462,28 @@ export const deleteRoom = async (id: string): Promise<void> => {
     .delete()
     .eq("id", id)
   
-  if (error) throw error
+  if (error) {
+    // Detect FK/constraint errors - room has bookings that must be handled first
+    const errAny: any = error as any
+    const isFK =
+      errAny?.code === '23503' ||
+      (typeof errAny?.message === 'string' && errAny.message.toLowerCase().includes('foreign key')) ||
+      (typeof errAny?.details === 'string' && errAny.details.toLowerCase().includes('foreign key')) ||
+      (typeof errAny?.message === 'string' && errAny.message.toLowerCase().includes('violates foreign key'))
+
+    if (isFK) {
+      // For rooms, we can try soft-delete by setting status to maintenance
+      console.warn(`[deleteRoom] FK constraint prevents delete for room ${id}. Attempting soft-delete (marking as maintenance).`)
+      try {
+        await updateRoom(id, { status: 'maintenance' as Room['status'] })
+        return
+      } catch (updateErr) {
+        console.error('[deleteRoom] Failed to mark room as maintenance after FK error:', updateErr)
+        throw new Error("Cannot delete room: There are bookings for this room. The room has been marked as 'maintenance' instead.")
+      }
+    }
+    throw error
+  }
 }
 
 // Services
@@ -568,7 +615,20 @@ export const deleteServiceCategory = async (id: string): Promise<void> => {
     .delete()
     .eq("id", id)
 
-  if (error) throw error
+  if (error) {
+    // Detect FK/constraint errors - category has services that must be handled first
+    const errAny: any = error as any
+    const isFK =
+      errAny?.code === '23503' ||
+      (typeof errAny?.message === 'string' && errAny.message.toLowerCase().includes('foreign key')) ||
+      (typeof errAny?.details === 'string' && errAny.details.toLowerCase().includes('foreign key')) ||
+      (typeof errAny?.message === 'string' && errAny.message.toLowerCase().includes('violates foreign key'))
+
+    if (isFK) {
+      throw new Error("Cannot delete category: There are services in this category. Please move or delete those services first.")
+    }
+    throw error
+  }
 }
 
 // Bookings

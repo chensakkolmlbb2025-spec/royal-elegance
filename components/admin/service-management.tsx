@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { getServices, addService, updateService, deleteService } from "@/lib/supabase-service"
 import type { Service } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -15,13 +15,17 @@ import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Switch } from "@/components/ui/switch"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus, Pencil, Trash2, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
+import { useServiceDelete } from "@/hooks/use-delete-operation"
 
 export function ServiceManagement() {
   const [services, setServices] = useState<Service[]>([])
+  const [isLoading, setIsLoading] = useState(true)
   const [isOpen, setIsOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [isSaving, setIsSaving] = useState(false)
   const [formData, setFormData] = useState<{
     name: string
     description: string
@@ -42,13 +46,34 @@ export function ServiceManagement() {
   const [imageInput, setImageInput] = useState("")
   const { toast } = useToast()
 
+  // Refresh function for delete hook
+  const refreshServices = useCallback(async () => {
+    const fetchedServices = await getServices()
+    setServices(fetchedServices)
+  }, [])
+
+  // Delete operation with confirmation dialog, dependency check, and audit logging
+  const deleteOperation = useServiceDelete(deleteService, refreshServices)
+
   useEffect(() => {
     const fetchServices = async () => {
-      const fetchedServices = await getServices()
-      setServices(fetchedServices)
+      setIsLoading(true)
+      try {
+        const fetchedServices = await getServices()
+        setServices(fetchedServices)
+      } catch (error) {
+        console.error("[ServiceManagement] Error fetching services:", error)
+        toast({
+          title: "Error loading services",
+          description: "Please try refreshing the page.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
     }
     fetchServices()
-  }, [])
+  }, [toast])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -71,17 +96,17 @@ export function ServiceManagement() {
       return
     }
     
+    setIsSaving(true)
     try {
       if (editingId) {
         await updateService(editingId, { ...formData, slug })
         toast({ title: "Service updated successfully" })
       } else {
-  await addService({ ...formData, slug })
+        await addService({ ...formData, slug })
         toast({ title: "Service added successfully" })
       }
       // Refresh services list
-      const fetchedServices = await getServices()
-      setServices(fetchedServices)
+      await refreshServices()
       setIsOpen(false)
       resetForm()
     } catch (error) {
@@ -92,6 +117,8 @@ export function ServiceManagement() {
         description: errorMessage,
         variant: "destructive" 
       })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -109,17 +136,9 @@ export function ServiceManagement() {
     setIsOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteService(id)
-      toast({ title: "Service deleted successfully" })
-      // Refresh services list
-      const fetchedServices = await getServices()
-      setServices(fetchedServices)
-    } catch (error) {
-      console.error("[ServiceManagement] Error deleting service:", error)
-      toast({ title: "Error deleting service", variant: "destructive" })
-    }
+  // Handle delete - uses the new delete operation hook with confirmation
+  const handleDelete = (service: Service) => {
+    deleteOperation.initiateDelete(service.id, service.name)
   }
 
   const resetForm = () => {
@@ -140,8 +159,24 @@ export function ServiceManagement() {
   }
 
   return (
-    <Card className="glass-card">
-      <CardHeader className="flex flex-row items-center justify-between">
+    <>
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteOperation.state.isDialogOpen}
+        onOpenChange={deleteOperation.setDialogOpen}
+        onConfirm={deleteOperation.confirmDelete}
+        title="Delete Service"
+        itemName={deleteOperation.state.itemToDelete?.name || ""}
+        itemType="Service"
+        description="This will remove the service from availability. Are you sure?"
+        dependencies={deleteOperation.state.dependencies}
+        willSoftDelete={deleteOperation.state.willSoftDelete}
+        isLoading={deleteOperation.state.isLoading}
+        variant="danger"
+      />
+
+      <Card className="glass-card">
+        <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle>Service Management</CardTitle>
           <CardDescription>Manage hotel services and amenities</CardDescription>
@@ -300,8 +335,17 @@ export function ServiceManagement() {
                     <Button variant="ghost" size="icon" onClick={() => handleEdit(service)}>
                       <Pencil className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(service.id)}>
-                      <Trash2 className="w-4 h-4" />
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => handleDelete(service)}
+                      disabled={deleteOperation.state.isLoading}
+                    >
+                      {deleteOperation.state.isLoading && deleteOperation.state.itemToDelete?.id === service.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
                     </Button>
                   </div>
                 </TableCell>
@@ -311,5 +355,6 @@ export function ServiceManagement() {
         </Table>
       </CardContent>
     </Card>
+    </>
   )
 }

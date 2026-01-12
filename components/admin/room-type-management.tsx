@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { getRoomTypes, addRoomType, updateRoomType, deleteRoomType } from "@/lib/supabase-service"
 import type { RoomType } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -13,13 +13,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel"
 import { Textarea } from "@/components/ui/textarea"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Pencil, Trash2, Image as ImageIcon } from "lucide-react"
+import { Plus, Pencil, Trash2, Image as ImageIcon, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import Image from "next/image"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
+import { useRoomTypeDelete } from "@/hooks/use-delete-operation"
 
 export function RoomTypeManagement() {
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
   const [loading, setLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({
@@ -33,18 +36,8 @@ export function RoomTypeManagement() {
   const [imageInput, setImageInput] = useState("")
   const { toast } = useToast()
 
-  useEffect(() => {
-    loadRoomTypes()
-  }, [])
-
-  const handleOpenAddDialog = () => {
-    setEditingId(null)
-    setFormData({ name: "", description: "", basePrice: 0, maxOccupancy: 1, amenities: "", images: [] })
-    setImageInput("")
-    setIsOpen(true)
-  }
-
-  const loadRoomTypes = async () => {
+  // Refresh function for delete hook
+  const loadRoomTypes = useCallback(async () => {
     try {
       const data = await getRoomTypes()
       setRoomTypes(data)
@@ -53,6 +46,20 @@ export function RoomTypeManagement() {
     } finally {
       setLoading(false)
     }
+  }, [toast])
+
+  // Delete operation with confirmation dialog, dependency check, and audit logging
+  const deleteOperation = useRoomTypeDelete(deleteRoomType, loadRoomTypes)
+
+  useEffect(() => {
+    loadRoomTypes()
+  }, [loadRoomTypes])
+
+  const handleOpenAddDialog = () => {
+    setEditingId(null)
+    setFormData({ name: "", description: "", basePrice: 0, maxOccupancy: 1, amenities: "", images: [] })
+    setImageInput("")
+    setIsOpen(true)
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -73,6 +80,7 @@ export function RoomTypeManagement() {
       images: formData.images,
     }
 
+    setIsSaving(true)
     try {
       if (editingId) {
         await updateRoomType(editingId, data)
@@ -96,6 +104,8 @@ export function RoomTypeManagement() {
         description: errorMessage,
         variant: "destructive" 
       })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -112,14 +122,9 @@ export function RoomTypeManagement() {
     setIsOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteRoomType(id)
-      toast({ title: "Room type deleted successfully" })
-      await loadRoomTypes()
-    } catch (error) {
-      toast({ title: "Error deleting room type", variant: "destructive" })
-    }
+  // Handle delete - uses the new delete operation hook with confirmation
+  const handleDelete = (roomType: RoomType) => {
+    deleteOperation.initiateDelete(roomType.id, roomType.name)
   }
 
   const resetForm = () => {
@@ -144,7 +149,23 @@ export function RoomTypeManagement() {
   }
 
   return (
-    <Card className="glass-card">
+    <>
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteOperation.state.isDialogOpen}
+        onOpenChange={deleteOperation.setDialogOpen}
+        onConfirm={deleteOperation.confirmDelete}
+        title="Delete Room Type"
+        itemName={deleteOperation.state.itemToDelete?.name || ""}
+        itemType="Room Type"
+        description="This will permanently delete this room type. Rooms of this type must be reassigned or deleted first."
+        dependencies={deleteOperation.state.dependencies}
+        willSoftDelete={deleteOperation.state.willSoftDelete}
+        isLoading={deleteOperation.state.isLoading}
+        variant="danger"
+      />
+
+      <Card className="glass-card">
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle>Room Type Management</CardTitle>
@@ -325,9 +346,14 @@ export function RoomTypeManagement() {
                 <Button 
                   variant="destructive" 
                   className="flex-1"
-                  onClick={() => handleDelete(roomType.id)}
+                  onClick={() => handleDelete(roomType)}
+                  disabled={deleteOperation.state.isLoading && deleteOperation.state.itemToDelete?.id === roomType.id}
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
+                  {deleteOperation.state.isLoading && deleteOperation.state.itemToDelete?.id === roomType.id ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4 mr-2" />
+                  )}
                   Delete
                 </Button>
               </CardFooter>
@@ -336,5 +362,6 @@ export function RoomTypeManagement() {
         </div>
       </CardContent>
     </Card>
+    </>
   )
 }

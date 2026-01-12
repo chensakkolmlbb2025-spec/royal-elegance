@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { getRooms, getFloors, getRoomTypes, addRoom, updateRoom, deleteRoom } from "@/lib/supabase-service"
 import type { Room, Floor, RoomType } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -13,13 +13,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus, Pencil, Trash2, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
+import { useRoomDelete } from "@/hooks/use-delete-operation"
 
 export function RoomManagement() {
   const [rooms, setRooms] = useState<Room[]>([])
   const [floors, setFloors] = useState<Floor[]>([])
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState<{
@@ -35,38 +39,66 @@ export function RoomManagement() {
   })
   const { toast } = useToast()
 
-  useEffect(() => {
-    const fetchRooms = async () => {
-      const roomsData = await getRooms()
-      setRooms(roomsData)
-    }
-
-    const fetchFloors = async () => {
-      const floorsData = await getFloors()
-      setFloors(floorsData)
-    }
-
-    const fetchRoomTypes = async () => {
-      const roomTypesData = await getRoomTypes()
-      setRoomTypes(roomTypesData)
-    }
-
-    fetchRooms()
-    fetchFloors()
-    fetchRoomTypes()
+  // Refresh function for delete hook
+  const refreshRooms = useCallback(async () => {
+    const roomsData = await getRooms()
+    setRooms(roomsData)
   }, [])
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault()
-    if (editingId) {
-      updateRoom(editingId, formData)
-      toast({ title: "Room updated successfully" })
-    } else {
-      addRoom(formData)
-      toast({ title: "Room added successfully" })
+  // Delete operation with confirmation dialog, dependency check, and audit logging
+  const deleteOperation = useRoomDelete(deleteRoom, refreshRooms)
+
+  useEffect(() => {
+    const fetchData = async () => {
+      setIsLoading(true)
+      try {
+        const [roomsData, floorsData, roomTypesData] = await Promise.all([
+          getRooms(),
+          getFloors(),
+          getRoomTypes()
+        ])
+        setRooms(roomsData)
+        setFloors(floorsData)
+        setRoomTypes(roomTypesData)
+      } catch (error) {
+        console.error("[RoomManagement] Error fetching data:", error)
+        toast({
+          title: "Error loading data",
+          description: "Please try refreshing the page.",
+          variant: "destructive",
+        })
+      } finally {
+        setIsLoading(false)
+      }
     }
-    setIsOpen(false)
-    resetForm()
+    fetchData()
+  }, [toast])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSaving(true)
+    try {
+      if (editingId) {
+        await updateRoom(editingId, formData)
+        toast({ title: "Room updated successfully" })
+      } else {
+        await addRoom(formData)
+        toast({ title: "Room added successfully" })
+      }
+      await refreshRooms()
+      setIsOpen(false)
+      resetForm()
+    } catch (error) {
+      console.error("[RoomManagement] Error saving room:", error)
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      toast({
+        title: "Error saving room",
+        description: errorMessage,
+        variant: "destructive",
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleEdit = (room: Room) => {
@@ -80,9 +112,9 @@ export function RoomManagement() {
     setIsOpen(true)
   }
 
-  const handleDelete = (id: string) => {
-    deleteRoom(id)
-    toast({ title: "Room deleted successfully" })
+  // Handle delete - uses the new delete operation hook with confirmation
+  const handleDelete = (room: Room) => {
+    deleteOperation.initiateDelete(room.id, `Room ${room.roomNumber}`)
   }
 
   const resetForm = () => {
@@ -109,7 +141,23 @@ export function RoomManagement() {
   }
 
   return (
-    <Card className="glass-card">
+    <>
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteOperation.state.isDialogOpen}
+        onOpenChange={deleteOperation.setDialogOpen}
+        onConfirm={deleteOperation.confirmDelete}
+        title="Delete Room"
+        itemName={deleteOperation.state.itemToDelete?.name || ""}
+        itemType="Room"
+        description="This will remove the room from the system. Are you sure?"
+        dependencies={deleteOperation.state.dependencies}
+        willSoftDelete={deleteOperation.state.willSoftDelete}
+        isLoading={deleteOperation.state.isLoading}
+        variant="danger"
+      />
+
+      <Card className="glass-card">
       <CardHeader className="flex flex-row items-center justify-between">
         <div>
           <CardTitle>Room Management</CardTitle>
@@ -222,8 +270,17 @@ export function RoomManagement() {
                     <Button variant="ghost" size="icon" onClick={() => handleEdit(room)}>
                       <Pencil className="w-4 h-4" />
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDelete(room.id)}>
-                      <Trash2 className="w-4 h-4" />
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={() => handleDelete(room)}
+                      disabled={deleteOperation.state.isLoading}
+                    >
+                      {deleteOperation.state.isLoading && deleteOperation.state.itemToDelete?.id === room.id ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Trash2 className="w-4 h-4" />
+                      )}
                     </Button>
                   </div>
                 </TableCell>
@@ -233,5 +290,6 @@ export function RoomManagement() {
         </Table>
       </CardContent>
     </Card>
+    </>
   )
 }

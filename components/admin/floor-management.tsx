@@ -1,7 +1,7 @@
 "use client"
 
 import type React from "react"
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { getFloors, addFloor, updateFloor, deleteFloor } from "@/lib/supabase-service"
 import type { Floor } from "@/lib/types"
 import { Button } from "@/components/ui/button"
@@ -11,16 +11,37 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Textarea } from "@/components/ui/textarea"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus, Pencil, Trash2, Loader2 } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { DeleteConfirmationDialog } from "@/components/ui/delete-confirmation-dialog"
+import { useFloorDelete } from "@/hooks/use-delete-operation"
 
 export function FloorManagement() {
   const [floors, setFloors] = useState<Floor[]>([])
   const [loading, setLoading] = useState(true)
+  const [isSaving, setIsSaving] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [formData, setFormData] = useState({ name: "", number: 0, description: "" })
   const { toast } = useToast()
+
+  // Refresh function for delete hook
+  const refreshFloors = useCallback(async () => {
+    try {
+      const floorsData = await getFloors()
+      setFloors(floorsData)
+    } catch (error) {
+      console.error("Error fetching floors:", error)
+      toast({ 
+        title: "Error loading floors", 
+        description: "Please ensure the floors table exists and has proper permissions.",
+        variant: "destructive" 
+      })
+    }
+  }, [toast])
+
+  // Delete operation with confirmation dialog, dependency check, and audit logging
+  const deleteOperation = useFloorDelete(deleteFloor, refreshFloors)
 
   useEffect(() => {
     const fetchFloors = async () => {
@@ -43,6 +64,7 @@ export function FloorManagement() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    setIsSaving(true)
     try {
       if (editingId) {
         await updateFloor(editingId, formData)
@@ -56,7 +78,14 @@ export function FloorManagement() {
       setIsOpen(false)
       resetForm()
     } catch (error) {
-      toast({ title: "Error saving floor", variant: "destructive" })
+      const errorMessage = error instanceof Error ? error.message : "Unknown error"
+      toast({ 
+        title: "Error saving floor", 
+        description: errorMessage,
+        variant: "destructive" 
+      })
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -66,14 +95,9 @@ export function FloorManagement() {
     setIsOpen(true)
   }
 
-  const handleDelete = async (id: string) => {
-    try {
-      await deleteFloor(id)
-      setFloors(floors.filter((f) => f.id !== id))
-      toast({ title: "Floor deleted successfully" })
-    } catch (error) {
-      toast({ title: "Error deleting floor", variant: "destructive" })
-    }
+  // Handle delete - uses the new delete operation hook with confirmation
+  const handleDelete = (floor: Floor) => {
+    deleteOperation.initiateDelete(floor.id, floor.name)
   }
 
   const resetForm = () => {
@@ -92,7 +116,23 @@ export function FloorManagement() {
   }
 
   return (
-    <Card className="glass-card border-0 animate-fade-in-up">
+    <>
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteOperation.state.isDialogOpen}
+        onOpenChange={deleteOperation.setDialogOpen}
+        onConfirm={deleteOperation.confirmDelete}
+        title="Delete Floor"
+        itemName={deleteOperation.state.itemToDelete?.name || ""}
+        itemType="Floor"
+        description="This will permanently delete this floor. All rooms on this floor must be moved or deleted first."
+        dependencies={deleteOperation.state.dependencies}
+        willSoftDelete={deleteOperation.state.willSoftDelete}
+        isLoading={deleteOperation.state.isLoading}
+        variant="danger"
+      />
+
+      <Card className="glass-card border-0 animate-fade-in-up">
       <CardHeader className="flex flex-row items-center justify-between bg-gradient-to-br from-white/95 to-background-accent/20">
         <div>
           <CardTitle className="font-display text-slate-900">Floor Management</CardTitle>
@@ -175,8 +215,17 @@ export function FloorManagement() {
                       <Button variant="ghost" size="icon" onClick={() => handleEdit(floor)}>
                         <Pencil className="w-4 h-4" />
                       </Button>
-                      <Button variant="ghost" size="icon" onClick={() => handleDelete(floor.id)}>
-                        <Trash2 className="w-4 h-4" />
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => handleDelete(floor)}
+                        disabled={deleteOperation.state.isLoading}
+                      >
+                        {deleteOperation.state.isLoading && deleteOperation.state.itemToDelete?.id === floor.id ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="w-4 h-4" />
+                        )}
                       </Button>
                     </div>
                   </TableCell>
@@ -187,5 +236,6 @@ export function FloorManagement() {
         </Table>
       </CardContent>
     </Card>
+    </>
   )
 }

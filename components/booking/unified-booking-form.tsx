@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useMemo, useEffect } from "react"
 import { useRouter } from "next/navigation"
 import { motion, AnimatePresence } from "framer-motion"
 import { createClient } from "@/lib/supabase/client"
@@ -14,7 +14,9 @@ import {
   Sparkles, 
   Minus, 
   Plus,
-  AlertCircle
+  AlertCircle,
+  Loader2,
+  ShieldCheck
 } from "lucide-react"
 
 // UI Components
@@ -27,6 +29,14 @@ import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { StripePaymentElementWrapper } from "@/components/payment/stripe-payment-element"
 import { useToast } from "@/hooks/use-toast"
+
+// Transaction-safe booking service
+import { 
+  createBookingWithRetry, 
+  checkRoomAvailability,
+  BookingErrorMessages,
+  type BookingErrorCode 
+} from "@/lib/booking-service"
 
 // Types
 import type { RoomType, Room, Service } from "@/lib/types"
@@ -52,6 +62,48 @@ export function UnifiedBookingForm({ user, roomType, room, services, onCancel }:
   const [showPayment, setShowPayment] = useState(false)
   const [createdBookingId, setCreatedBookingId] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false)
+  const [roomAvailable, setRoomAvailable] = useState<boolean | null>(null)
+  const [availabilityError, setAvailabilityError] = useState<string | null>(null)
+
+  // --- Real-time availability check ---
+  useEffect(() => {
+    const checkAvailability = async () => {
+      if (!checkIn || !checkOut) {
+        setRoomAvailable(null)
+        setAvailabilityError(null)
+        return
+      }
+
+      // Skip if dates are invalid
+      if (new Date(checkOut) <= new Date(checkIn)) {
+        return
+      }
+
+      setIsCheckingAvailability(true)
+      setAvailabilityError(null)
+
+      try {
+        const result = await checkRoomAvailability(room.id, checkIn, checkOut)
+        setRoomAvailable(result.isAvailable)
+        
+        if (!result.isAvailable && result.conflictingBookings.length > 0) {
+          setAvailabilityError(
+            `This room is already booked for some of your selected dates. Please choose different dates.`
+          )
+        }
+      } catch (error) {
+        console.error('Availability check failed:', error)
+        setAvailabilityError('Could not verify availability. Please try again.')
+      } finally {
+        setIsCheckingAvailability(false)
+      }
+    }
+
+    // Debounce the check
+    const timeoutId = setTimeout(checkAvailability, 500)
+    return () => clearTimeout(timeoutId)
+  }, [checkIn, checkOut, room.id])
 
   // --- Calculations ---
 
@@ -83,6 +135,18 @@ export function UnifiedBookingForm({ user, roomType, room, services, onCancel }:
     return null
   }, [checkIn, checkOut])
 
+  // Check if form is valid for submission
+  const canSubmit = useMemo(() => {
+    return (
+      checkIn && 
+      checkOut && 
+      !dateError && 
+      roomAvailable === true && 
+      !isCheckingAvailability &&
+      !isSubmitting
+    )
+  }, [checkIn, checkOut, dateError, roomAvailable, isCheckingAvailability, isSubmitting])
+
   // --- Handlers ---
 
   const toggleService = (serviceId: string) => {
@@ -102,60 +166,46 @@ export function UnifiedBookingForm({ user, roomType, room, services, onCancel }:
     })
   }
 
-  // Helper to snake_case keys for Supabase
-  const toSnakeCase = (obj: any): any => {
-    if (Array.isArray(obj)) return obj.map(toSnakeCase)
-    if (obj !== null && typeof obj === "object") {
-      return Object.keys(obj).reduce((acc, key) => {
-        const snakeKey = key.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
-        acc[snakeKey] = toSnakeCase(obj[key])
-        return acc
-      }, {} as any)
-    }
-    return obj
-  }
-
+  // Transaction-safe booking creation
   const handleCreateBooking = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (dateError) return
+    if (!canSubmit) return
+    
     setIsSubmitting(true)
 
     try {
-      const bookingData = {
+      // Use the transaction-safe booking API with retry logic
+      const result = await createBookingWithRetry({
         userId: user.id,
-        guestName: (user as any)?.user_metadata?.full_name || user.email?.split('@')[0] || "Guest",
-        guestEmail: user.email || "",
-        guestPhone: (user as any)?.user_metadata?.phone || "Not provided",
-        guestCount: guests,
         roomId: room.id,
         roomTypeId: roomType.id,
         checkInDate: checkIn,
         checkOutDate: checkOut,
+        guestName: (user as any)?.user_metadata?.full_name || user.email?.split('@')[0] || "Guest",
+        guestEmail: user.email || "",
+        guestPhone: (user as any)?.user_metadata?.phone || "Not provided",
+        guestCount: guests,
         roomPrice: totals.room,
         servicesPrice: totals.services,
         totalPrice: totals.total,
-        status: "confirmed",
-        paymentStatus: "pending",
+        specialRequests: undefined,
         paymentMethod: "credit_card",
-        paidAmount: 0,
-        bookingReference: `BK-${Date.now()}-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+      }, 3, 500) // 3 retries, 500ms base delay
+
+      if (!result.success) {
+        // Get user-friendly error message
+        const errorMessage = result.errorCode 
+          ? BookingErrorMessages[result.errorCode as BookingErrorCode] || result.errorMessage
+          : result.errorMessage
+
+        throw new Error(errorMessage || "Failed to create booking")
       }
 
-      const dbBooking = toSnakeCase(bookingData)
-
-      const { data: newBooking, error: bookingError } = await supabase
-        .from("bookings")
-        .insert([dbBooking])
-        .select()
-        .single()
-
-      if (bookingError || !newBooking) throw new Error(bookingError?.message || "Failed to create booking")
-
-      const bookingId = newBooking.id as string
+      const bookingId = result.bookingId!
       setCreatedBookingId(bookingId)
 
-      // Insert Services
-      if (selectedServices.length > 0) {
+      // Insert Services using supabase directly (or could add to booking-service)
+      if (selectedServices.length > 0 && bookingId) {
         const bookingServices = selectedServices.map(serviceId => {
           const service = services.find(s => s.id === serviceId)
           return {
@@ -170,14 +220,22 @@ export function UnifiedBookingForm({ user, roomType, room, services, onCancel }:
         await supabase.from('booking_services').insert(bookingServices)
       }
 
+      toast({
+        title: "Booking created!",
+        description: `Reference: ${result.bookingReference}`,
+      })
+
       setShowPayment(true)
     } catch (err: any) {
-      console.error(err)
+      console.error('Booking error:', err)
       toast({ 
         title: "Booking failed", 
         description: err.message, 
         variant: "destructive" 
       })
+      
+      // Re-check availability in case room was booked by someone else
+      setRoomAvailable(null)
     } finally {
       setIsSubmitting(false)
     }
@@ -306,6 +364,28 @@ export function UnifiedBookingForm({ user, roomType, room, services, onCancel }:
                     <AlertDescription>{dateError}</AlertDescription>
                   </Alert>
                 )}
+
+                {/* Availability Status Indicator */}
+                {checkIn && checkOut && !dateError && (
+                  <div className="flex items-center gap-2 p-3 rounded-lg border transition-all duration-300">
+                    {isCheckingAvailability ? (
+                      <>
+                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                        <span className="text-sm text-muted-foreground">Checking availability...</span>
+                      </>
+                    ) : roomAvailable === true ? (
+                      <>
+                        <ShieldCheck className="h-4 w-4 text-green-600" />
+                        <span className="text-sm text-green-700 font-medium">Room available for selected dates</span>
+                      </>
+                    ) : roomAvailable === false ? (
+                      <>
+                        <AlertCircle className="h-4 w-4 text-red-500" />
+                        <span className="text-sm text-red-600 font-medium">{availabilityError || 'Room not available'}</span>
+                      </>
+                    ) : null}
+                  </div>
+                )}
               </div>
 
               <Separator />
@@ -410,10 +490,24 @@ export function UnifiedBookingForm({ user, roomType, room, services, onCancel }:
                 type="submit" 
                 size="lg" 
                 className="w-full sm:flex-1 font-semibold text-base h-12 shadow-lg hover:shadow-xl transition-all"
-                disabled={!checkIn || !checkOut || !!dateError || isSubmitting}
+                disabled={!canSubmit}
               >
-                {isSubmitting ? "Processing..." : "Continue to Payment"}
-                {!isSubmitting && <ArrowRight className="ml-2 w-4 h-4" />}
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                    Creating Booking...
+                  </>
+                ) : isCheckingAvailability ? (
+                  <>
+                    <Loader2 className="mr-2 w-4 h-4 animate-spin" />
+                    Checking Availability...
+                  </>
+                ) : (
+                  <>
+                    Continue to Payment
+                    <ArrowRight className="ml-2 w-4 h-4" />
+                  </>
+                )}
               </Button>
               
               {onCancel && (
