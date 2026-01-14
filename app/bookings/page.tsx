@@ -302,7 +302,8 @@ export default function BookingsPage() {
   }
 
   // Filter bookings by status for proper categorization
-  // Upcoming: Future bookings that are confirmed/pending and check-in date hasn't passed
+  // Upcoming: Bookings that are confirmed/pending and check-in date is today or future
+  // These stay in "Upcoming" until check-in date has passed (yesterday or earlier)
   const upcomingBookings = bookings.filter(b => 
     (b.status === "confirmed" || b.status === "pending") && !isCheckInDatePassed(b)
   )
@@ -310,12 +311,13 @@ export default function BookingsPage() {
   // Staying: Bookings where guest is currently checked in
   const stayingBookings = bookings.filter(b => b.status === "checked_in")
   
-  // No Show: Explicitly marked as no_show OR past check-in date without check-in (staff oversight)
+  // No Show: Explicitly marked as no_show OR check-in date has passed without check-in
+  // Only moves here when check-in date is in the past (yesterday or earlier)
   const noShowBookings = bookings.filter(b => {
-    // Explicitly marked as no_show
+    // Explicitly marked as no_show by staff
     if (b.status === "no_show") return true
-    // Past check-in/check-out dates without any status update (still pending/confirmed)
-    if ((b.status === "confirmed" || b.status === "pending") && isCheckOutDatePassed(b)) {
+    // Check-in date has passed (not today, but yesterday or earlier) without check-in
+    if ((b.status === "confirmed" || b.status === "pending") && isCheckInDatePassed(b)) {
       return true
     }
     return false
