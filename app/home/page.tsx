@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { Button } from "@/components/ui/button"
 import { Calendar, Hotel, Sparkles } from "lucide-react"
@@ -30,14 +30,19 @@ export default function UserHomePage() {
   const [bookings, setBookings] = useState<Booking[]>([])
   const [roomTypes, setRoomTypes] = useState<RoomType[]>([])
   const [rooms, setRooms] = useState<Room[]>([])
-  const [loadingData, setLoadingData] = useState(true)
+  const [loadingData, setLoadingData] = useState(false)
+  const authCheckDone = useRef(false)
 
   useEffect(() => {
     setMounted(true)
   }, [])
 
   useEffect(() => {
+    if (authCheckDone.current) return
+    
     const checkAuth = async () => {
+      authCheckDone.current = true
+      
       try {
         const supabase = createClient()
         const { data: { session } } = await supabase.auth.getSession()
@@ -55,14 +60,24 @@ export default function UserHomePage() {
           .single()
 
         if (profile) {
-          setUser({
+          const userData = {
             id: session.user.id,
             email: session.user.email || '',
             role: profile.role || 'user',
             fullName: profile.full_name || '',
             phone: profile.phone || '',
             emailConfirmed: session.user.email_confirmed_at !== null,
-          })
+          }
+          
+          // Check role before setting user
+          if (userData.role !== 'user') {
+            router.replace('/')
+            return
+          }
+          
+          setUser(userData)
+        } else {
+          router.replace('/login')
         }
       } catch (error) {
         console.error('Auth check error:', error)
@@ -79,6 +94,7 @@ export default function UserHomePage() {
     const fetchData = async () => {
       if (!user) return
 
+      setLoadingData(true)
       try {
         const [userBookings, types, allRooms] = await Promise.all([
           getBookingsByUser(user.id),
@@ -101,16 +117,30 @@ export default function UserHomePage() {
     }
   }, [user])
 
-  useEffect(() => {
-    if (!loading && !user) {
-      router.push("/")
-    } else if (user && user.role !== "user") {
-      router.push("/")
-    }
-  }, [user, loading, router])
+  // Show loading during auth check or data fetch
+  if (!mounted || loading || loadingData) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background">
+        <PremiumNavbar />
+        <main className="max-w-7xl mx-auto px-4 py-12" style={{ marginTop: "112px" }}>
+          <Loading message="Loading home..." variant="content" />
+        </main>
+        <PremiumFooter />
+      </div>
+    )
+  }
 
-  if (!mounted || loading || loadingData || !user) {
-    return <Loading message="Loading home..." size="lg" />
+  // Don't render if no user (will redirect)
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background">
+        <PremiumNavbar />
+        <main className="max-w-7xl mx-auto px-4 py-12" style={{ marginTop: "112px" }}>
+          <Loading message="Redirecting..." variant="content" />
+        </main>
+        <PremiumFooter />
+      </div>
+    )
   }
 
   // Filter upcoming bookings (same logic as bookings page)

@@ -229,6 +229,17 @@ export default function BookingsPage() {
       setRoomTypes(allRoomTypes)
       setServices(allServices)
 
+      // Debug: Log bookings data
+      console.log('[Bookings Debug] Total bookings fetched:', userBookings.length)
+      console.log('[Bookings Debug] Bookings:', userBookings.map(b => ({
+        id: b.id,
+        reference: b.bookingReference,
+        status: b.status,
+        checkIn: b.checkIn,
+        checkOut: b.checkOut,
+        createdAt: b.createdAt
+      })))
+
     } catch (error) {
       console.error("Error fetching bookings:", error)
       toast({
@@ -325,6 +336,22 @@ export default function BookingsPage() {
   
   // Cancelled: Cancelled bookings
   const cancelledBookings = bookings.filter(b => b.status === "cancelled")
+
+  // Debug: Log categorized bookings
+  console.log('[Bookings Debug] Categorized:', {
+    total: bookings.length,
+    upcoming: upcomingBookings.length,
+    staying: stayingBookings.length,
+    noShow: noShowBookings.length,
+    history: historyBookings.length,
+    cancelled: cancelledBookings.length
+  })
+  console.log('[Bookings Debug] Upcoming bookings:', upcomingBookings.map(b => ({
+    ref: b.bookingReference,
+    status: b.status,
+    checkIn: b.checkIn,
+    isCheckInPassed: isCheckInDatePassed(b)
+  })))
 
   // Action handlers
   const handleCheckIn = async (booking: Booking) => {
@@ -426,8 +453,11 @@ export default function BookingsPage() {
         </div>
 
         {/* Booking Tabs */}
-        <Tabs defaultValue="upcoming" className="w-full">
-          <TabsList className="w-full sm:w-auto grid grid-cols-5 sm:inline-flex h-10 items-center justify-center rounded-md bg-slate-100 p-1 text-slate-500">
+        <Tabs defaultValue="all" className="w-full">
+          <TabsList className="w-full sm:w-auto grid grid-cols-6 sm:inline-flex h-10 items-center justify-center rounded-md bg-slate-100 p-1 text-slate-500">
+            <TabsTrigger value="all" className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm text-xs sm:text-sm">
+              All ({bookings.length})
+            </TabsTrigger>
             <TabsTrigger value="upcoming" className="data-[state=active]:bg-white data-[state=active]:text-slate-900 data-[state=active]:shadow-sm text-xs sm:text-sm">
               Upcoming ({upcomingBookings.length})
             </TabsTrigger>
@@ -448,6 +478,53 @@ export default function BookingsPage() {
           </TabsList>
 
           <div className="mt-6 space-y-4">
+            {/* ALL BOOKINGS CONTENT - For debugging */}
+            <TabsContent value="all" className="space-y-4">
+              {bookings.length === 0 ? (
+                <EmptyState 
+                  icon={Calendar} 
+                  title="No bookings found" 
+                  description="You haven't made any bookings yet. Start planning your stay!"
+                  actionLabel="Browse Rooms"
+                  onAction={() => router.push("/rooms")}
+                />
+              ) : (
+                <>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-blue-800">
+                      <strong>Debug View:</strong> Showing all {bookings.length} booking(s) regardless of status or date.
+                    </p>
+                  </div>
+                  {bookings.map(booking => {
+                    // Determine type for each booking
+                    let bookingType: "upcoming" | "staying" | "history" | "cancelled" | "no_show" = "upcoming"
+                    if (booking.status === "cancelled") bookingType = "cancelled"
+                    else if (booking.status === "checked_out") bookingType = "history"
+                    else if (booking.status === "checked_in") bookingType = "staying"
+                    else if (booking.status === "no_show") bookingType = "no_show"
+                    else if (isCheckOutDatePassed(booking)) bookingType = "no_show"
+                    
+                    return (
+                      <BookingCard 
+                        key={booking.id} 
+                        booking={booking} 
+                        roomType={getRoomTypeForBooking(booking)}
+                        bookingServices={getServicesForBooking(booking)}
+                        isExpanded={expandedBookings.has(booking.id)}
+                        onToggle={() => toggleBookingDetails(booking.id)}
+                        onCancel={() => handleCancelBooking(booking.id)}
+                        onCheckIn={() => openActionDialog('check_in', booking)}
+                        onCheckOut={() => openActionDialog('check_out', booking)}
+                        onMarkNoShow={() => openActionDialog('no_show', booking)}
+                        type={bookingType}
+                        isCheckInDatePassed={isCheckInDatePassed(booking)}
+                      />
+                    )
+                  })}
+                </>
+              )}
+            </TabsContent>
+
             {/* UPCOMING CONTENT */}
             <TabsContent value="upcoming" className="space-y-4">
               {upcomingBookings.length === 0 ? (

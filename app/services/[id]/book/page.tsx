@@ -79,11 +79,29 @@ export default function ServiceBookingPage() {
   }, [serviceId, router])
 
   if (loading || loadingService) {
-    return <Loading message="Loading service..." size="lg" />
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background">
+        <PremiumNavbar />
+        <main className="container mx-auto px-4 py-8" style={{ marginTop: "112px" }}>
+          <Loading message="Loading service..." variant="content" />
+        </main>
+        <PremiumFooter />
+      </div>
+    )
   }
 
   if (!service) {
-    return null
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background">
+        <PremiumNavbar />
+        <main className="container mx-auto px-4 py-8" style={{ marginTop: "112px" }}>
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Service not found</p>
+          </div>
+        </main>
+        <PremiumFooter />
+      </div>
+    )
   }
 
   return (

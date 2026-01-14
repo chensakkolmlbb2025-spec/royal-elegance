@@ -1,7 +1,7 @@
 "use client"
 
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useEffect, useState, useRef } from "react"
 import { createClient } from "@/lib/supabase/client"
 import { PremiumNavbar } from "@/components/layout/premium-navbar"
 import { PremiumFooter } from "@/components/layout/premium-footer"
@@ -12,13 +12,16 @@ import Loading from "@/components/ui/loading"
 export default function LandingPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(true)
-  const [authChecked, setAuthChecked] = useState(false)
+  const [shouldShowLanding, setShouldShowLanding] = useState(false)
+  const authCheckDone = useRef(false)
 
   useEffect(() => {
-    // Prevent multiple auth checks
-    if (authChecked) return
+    // Prevent multiple auth checks using ref (doesn't cause re-render)
+    if (authCheckDone.current) return
 
     const checkAuth = async () => {
+      authCheckDone.current = true
+      
       try {
         const supabase = createClient()
         const { data: { session } } = await supabase.auth.getSession()
@@ -33,7 +36,7 @@ export default function LandingPage() {
 
           const role = profile?.role || 'user'
 
-          // Redirect based on role
+          // Redirect based on role - don't show landing page
           if (role === 'admin') {
             router.replace('/admin')
           } else if (role === 'staff') {
@@ -41,21 +44,31 @@ export default function LandingPage() {
           } else {
             router.replace('/home')
           }
+          // Keep loading true during redirect to prevent flash
           return
         }
+        
+        // No user - show landing page
+        setShouldShowLanding(true)
       } catch (error) {
         console.error('Auth check error:', error)
+        // On error, show landing page
+        setShouldShowLanding(true)
       } finally {
         setLoading(false)
-        setAuthChecked(true)
       }
     }
 
     checkAuth()
-  }, [router, authChecked])
+  }, [router])
 
   if (loading) {
-    return <Loading message="Loading..." size="lg" />
+    return <Loading message="Loading..." size="lg" variant="fullpage" />
+  }
+
+  // Don't render landing page if redirecting
+  if (!shouldShowLanding) {
+    return <Loading message="Redirecting..." size="lg" variant="fullpage" />
   }
 
   return (

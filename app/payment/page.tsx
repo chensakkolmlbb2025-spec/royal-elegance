@@ -114,7 +114,15 @@ function PaymentPageContent() {
   }
 
   if (loading || !booking) {
-    return <Loading message="Loading payment details..." size="lg" />
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background">
+        <PremiumNavbar />
+        <main className="container mx-auto px-4 py-8" style={{ marginTop: "112px" }}>
+          <Loading message="Loading payment details..." variant="content" />
+        </main>
+        <PremiumFooter />
+      </div>
+    )
   }
 
   const room = rooms.find((r) => r.id === booking.roomId)

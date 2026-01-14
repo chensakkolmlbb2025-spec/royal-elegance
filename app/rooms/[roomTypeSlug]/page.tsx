@@ -147,13 +147,28 @@ export default function RoomTypeDetailPage() {
   }
 
   if (loading) {
-    return <Loading message="Loading room type..." size="lg" />
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background">
+        <PremiumNavbar />
+        <main className="container mx-auto px-4 py-8" style={{ marginTop: "112px" }}>
+          <Loading message="Loading room type..." variant="content" />
+        </main>
+        <PremiumFooter />
+      </div>
+    )
   }
 
   if (!roomType) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <p>Room type not found</p>
+      <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background">
+        <PremiumNavbar />
+        <main className="container mx-auto px-4 py-8" style={{ marginTop: "112px" }}>
+          <div className="text-center py-12">
+            <h2 className="text-xl font-semibold mb-4">Room type not found</h2>
+            <Button onClick={() => router.push('/rooms')}>View All Rooms</Button>
+          </div>
+        </main>
+        <PremiumFooter />
       </div>
     )
   }

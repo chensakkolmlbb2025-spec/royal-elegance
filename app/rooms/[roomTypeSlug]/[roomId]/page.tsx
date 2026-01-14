@@ -171,16 +171,28 @@ export default function RoomDetailPage() {
   }, [isGalleryOpen, nextImage, prevImage])
 
   if (loading) {
-    return <Loading message="Loading room details..." size="lg" />
+    return (
+      <div className="min-h-screen bg-[#faf9f7]">
+        <PremiumNavbar />
+        <main className="container mx-auto px-4 py-8" style={{ marginTop: "112px" }}>
+          <Loading message="Loading room details..." variant="content" />
+        </main>
+        <PremiumFooter />
+      </div>
+    )
   }
 
   if (!roomType || !room) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-50">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold text-slate-900 mb-2">Room not found</h2>
-          <Button onClick={() => router.push('/rooms')}>View All Rooms</Button>
-        </div>
+      <div className="min-h-screen bg-[#faf9f7]">
+        <PremiumNavbar />
+        <main className="container mx-auto px-4 py-8" style={{ marginTop: "112px" }}>
+          <div className="text-center py-12">
+            <h2 className="text-xl font-semibold text-slate-900 mb-2">Room not found</h2>
+            <Button onClick={() => router.push('/rooms')}>View All Rooms</Button>
+          </div>
+        </main>
+        <PremiumFooter />
       </div>
     )
   }
