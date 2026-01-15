@@ -219,13 +219,33 @@ export function UserManagement() {
     try {
       const supabase = createClient()
 
-      // Delete user profile
-      const { error } = await supabase
-        .from('profiles')
-        .delete()
-        .eq('id', id)
+      // Get the current user's session to send with the request
+      const { data: { session } } = await supabase.auth.getSession()
 
-      if (error) throw error
+      if (!session) {
+        toast({
+          title: "Authentication required",
+          description: "Please login again",
+          variant: "destructive"
+        })
+        return
+      }
+
+      // Call the admin API endpoint to delete the user
+      const response = await fetch('/api/admin/delete-user', {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({ userId: id })
+      })
+
+      const data = await response.json()
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.error || "Failed to delete user")
+      }
 
       toast({ title: "User deleted successfully" })
       await loadUsers()
