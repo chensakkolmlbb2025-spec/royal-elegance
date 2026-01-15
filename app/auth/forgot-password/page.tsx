@@ -1,10 +1,10 @@
 "use client"
 
-import { ResetPasswordForm } from "@/components/auth/reset-password-form"
+import { ForgotPasswordForm } from "@/components/auth/forgot-password-form"
 import { Hotel } from "lucide-react"
 import Link from "next/link"
 
-export default function ResetPasswordPage() {
+export default function ForgotPasswordPage() {
   return (
     <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-accent/5 to-background p-4">
       <div className="absolute inset-0 bg-[url('/luxury-hotel-lobby.png')] bg-cover bg-center opacity-10" />
@@ -23,9 +23,8 @@ export default function ResetPasswordPage() {
           </div>
         </Link>
 
-        <ResetPasswordForm />
+        <ForgotPasswordForm />
       </div>
     </main>
   )
 }
-

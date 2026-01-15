@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "restart TypeScript server to resolve import errors"
+  ],
+  "steps": [
+    "Press Cmd/Ctrl + Shift + P",
+    "Type: TypeScript: Restart TS Server",
+    "Press Enter"
+  ]
+}
