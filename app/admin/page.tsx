@@ -53,7 +53,6 @@ import { UserManagement } from "@/components/admin/user-management"
 import { RoomAvailabilityChecker } from "@/components/booking/room-availability-checker"
 import { BookingCalendar } from "@/components/admin/booking-calendar"
 import { BookingManagement } from "@/components/admin/booking-management"
-import { SeedDatabaseButton } from "@/components/admin/seed-database-button"
 
 // --- 1. Custom Hook for Logic Separation ---
 const useAdminData = (user: SupabaseUser | null) => {
@@ -431,12 +430,6 @@ export default function AdminPage() {
                   : `Manage your ${activeTab.replace('-', ' ')} settings here.`}
               </p>
             </div>
-            
-            {activeTab === 'dashboard' && (
-              <div className="flex items-center gap-2">
-                <SeedDatabaseButton />
-              </div>
-            )}
           </div>
 
           {/* Render Active Tab with Animation */}
