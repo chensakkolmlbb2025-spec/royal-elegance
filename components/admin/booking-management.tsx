@@ -308,6 +308,15 @@ export function BookingManagement() {
                 <Button
                   size="sm"
                   variant="outline"
+                  onClick={() => handleAction("no-show", booking)}
+                  className="h-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                  title="Mark as No Show"
+                >
+                  <UserX className="w-3 h-3" />
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
                   onClick={() => handleAction("cancel", booking)}
                   className="h-8"
                 >
@@ -325,6 +334,15 @@ export function BookingManagement() {
                 >
                   <LogIn className="w-3 h-3 mr-1" />
                   Check In
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleAction("no-show", booking)}
+                  className="h-8 text-orange-600 hover:text-orange-700 hover:bg-orange-50"
+                  title="Mark as No Show"
+                >
+                  <UserX className="w-3 h-3" />
                 </Button>
                 <Button
                   size="sm"
