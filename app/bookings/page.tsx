@@ -696,13 +696,26 @@ function BookingCard({ booking, roomType, bookingServices, isExpanded, onToggle,
   
   // Better title handling for service bookings
   let mainTitle = "Service Booking"
+  let subtitle = ""
+  
   if (roomType) {
     mainTitle = roomType.name
   } else if (bookingServices.length > 0) {
+    // Show first service name as title
     mainTitle = bookingServices[0].name
+    // Show category or description as subtitle
+    subtitle = bookingServices[0].category || bookingServices[0].description || ""
+    
+    // If multiple services, show count
+    if (bookingServices.length > 1) {
+      subtitle = subtitle 
+        ? `${subtitle} + ${bookingServices.length - 1} more` 
+        : `${bookingServices.length} services`
+    }
   } else if (booking.bookingType === 'service' && booking.servicesPrice > 0) {
     // Fallback for old service bookings without service ID
-    mainTitle = `Service Package ($${booking.servicesPrice})`
+    mainTitle = `Service Package`
+    subtitle = `Premium services ($${booking.servicesPrice})`
   }
   
   const isCancelled = type === "cancelled"
@@ -741,6 +754,11 @@ function BookingCard({ booking, roomType, bookingServices, isExpanded, onToggle,
                 <TypeBadge type={booking.bookingType} />
                 <StatusBadge status={booking.status} />
               </div>
+              {subtitle && (
+                <p className="text-sm text-slate-600 font-medium">
+                  {subtitle}
+                </p>
+              )}
               <p className="text-sm text-slate-500 flex items-center gap-2">
                 <span className="font-mono text-xs bg-slate-100 px-1.5 py-0.5 rounded text-slate-600">
                   #{booking.bookingReference}
@@ -782,19 +800,31 @@ function BookingCard({ booking, roomType, bookingServices, isExpanded, onToggle,
                 {/* Show service booking details if no room */}
                 {!roomType && booking.bookingType === 'service' && (
                   <div className="mb-3 p-3 bg-purple-50 rounded-lg border border-purple-100">
-                    <div className="flex items-center gap-2 text-purple-700 mb-1">
+                    <div className="flex items-center gap-2 text-purple-700 mb-2">
                       <Sparkles className="w-4 h-4" />
-                      <span className="text-sm font-medium">Service Booking</span>
+                      <span className="text-sm font-medium">Service Details</span>
                     </div>
-                    <p className="text-xs text-purple-600">
-                      {bookingServices.length > 0 
-                        ? bookingServices.map(s => s.name).join(', ')
-                        : 'Premium service package'
-                      }
-                    </p>
-                    {booking.specialRequests && (
-                      <p className="text-xs text-slate-600 mt-2 italic">
-                        Note: {booking.specialRequests}
+                    
+                    {bookingServices.length > 0 ? (
+                      <div className="space-y-2">
+                        {bookingServices.map((service, idx) => (
+                          <div key={service.id || idx} className="text-xs">
+                            <div className="font-medium text-purple-800">{service.name}</div>
+                            {service.category && (
+                              <div className="text-purple-600">{service.category}</div>
+                            )}
+                            {service.description && (
+                              <div className="text-purple-600 mt-0.5">{service.description}</div>
+                            )}
+                            <div className="text-purple-700 font-semibold mt-1">
+                              {formatCurrency(service.price)}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-purple-600">
+                        Premium service package
                       </p>
                     )}
                   </div>
