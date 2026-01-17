@@ -254,7 +254,11 @@ export function BookingManagement() {
   )
   
   const cancelledBookings = filteredBookings.filter(b => 
-    b.status === "cancelled" || b.status === "no_show"
+    b.status === "cancelled"
+  )
+  
+  const noShowBookings = filteredBookings.filter(b => 
+    b.status === "no_show"
   )
 
   const renderBookingRow = (booking: Booking) => {
@@ -427,7 +431,7 @@ export function BookingManagement() {
             </div>
           </div>
           
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
             <div className="p-4 bg-blue-50 rounded-lg border border-blue-100">
               <div className="text-2xl font-bold text-blue-700">{upcomingBookings.length}</div>
               <div className="text-sm text-blue-600">Upcoming</div>
@@ -440,9 +444,13 @@ export function BookingManagement() {
               <div className="text-2xl font-bold text-slate-700">{completedBookings.length}</div>
               <div className="text-sm text-slate-600">Completed</div>
             </div>
+            <div className="p-4 bg-red-50 rounded-lg border border-red-100">
+              <div className="text-2xl font-bold text-red-700">{cancelledBookings.length}</div>
+              <div className="text-sm text-red-600">Cancelled</div>
+            </div>
             <div className="p-4 bg-orange-50 rounded-lg border border-orange-100">
-              <div className="text-2xl font-bold text-orange-700">{cancelledBookings.length}</div>
-              <div className="text-sm text-orange-600">Cancelled/No Show</div>
+              <div className="text-2xl font-bold text-orange-700">{noShowBookings.length}</div>
+              <div className="text-sm text-orange-600">No Show</div>
             </div>
           </div>
         </CardContent>
@@ -450,12 +458,13 @@ export function BookingManagement() {
 
       {/* Tabs */}
       <Tabs defaultValue="all" className="space-y-4">
-        <TabsList className="grid grid-cols-5 w-full max-w-2xl">
+        <TabsList className="grid grid-cols-6 w-full max-w-3xl">
           <TabsTrigger value="all">All ({filteredBookings.length})</TabsTrigger>
           <TabsTrigger value="upcoming">Upcoming ({upcomingBookings.length})</TabsTrigger>
           <TabsTrigger value="active">Active ({activeBookings.length})</TabsTrigger>
           <TabsTrigger value="completed">Completed ({completedBookings.length})</TabsTrigger>
           <TabsTrigger value="cancelled">Cancelled ({cancelledBookings.length})</TabsTrigger>
+          <TabsTrigger value="no-show">No Show ({noShowBookings.length})</TabsTrigger>
         </TabsList>
 
         <TabsContent value="all">
@@ -572,6 +581,30 @@ export function BookingManagement() {
                 </TableHeader>
                 <TableBody>
                   {cancelledBookings.map(renderBookingRow)}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="no-show">
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Reference</TableHead>
+                    <TableHead>Guest</TableHead>
+                    <TableHead>Room</TableHead>
+                    <TableHead>Dates</TableHead>
+                    <TableHead>Guests</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>Total</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {noShowBookings.map(renderBookingRow)}
                 </TableBody>
               </Table>
             </CardContent>
