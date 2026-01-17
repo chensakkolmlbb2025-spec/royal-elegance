@@ -88,6 +88,7 @@ export function ServiceBookingForm({ service, onBack }: ServiceBookingFormProps)
         guestCount: guests,
         roomId: null as string | null,
         roomTypeId: null as string | null,
+        services: [service.id],
         checkInDate: formatDate(serviceDate),
         checkOutDate: addDays(serviceDate, 1),
         roomPrice: 0,
