@@ -693,7 +693,18 @@ function BookingCard({ booking, roomType, bookingServices, isExpanded, onToggle,
   const checkIn = new Date(booking.checkIn)
   const checkOut = new Date(booking.checkOut)
   const nights = Math.max(1, Math.ceil((checkOut.getTime() - checkIn.getTime()) / (1000 * 60 * 60 * 24)))
-  const mainTitle = roomType ? roomType.name : bookingServices[0]?.name || "Service Booking"
+  
+  // Better title handling for service bookings
+  let mainTitle = "Service Booking"
+  if (roomType) {
+    mainTitle = roomType.name
+  } else if (bookingServices.length > 0) {
+    mainTitle = bookingServices[0].name
+  } else if (booking.bookingType === 'service' && booking.servicesPrice > 0) {
+    // Fallback for old service bookings without service ID
+    mainTitle = `Service Package ($${booking.servicesPrice})`
+  }
+  
   const isCancelled = type === "cancelled"
   const isNoShow = type === "no_show"
   const isStaying = type === "staying"
@@ -767,6 +778,27 @@ function BookingCard({ booking, roomType, bookingServices, isExpanded, onToggle,
                   <span className="text-xs uppercase tracking-wide font-medium">Reservation Details</span>
                 </div>
                 <h4 className="text-lg font-display font-medium text-slate-900 mb-2">{mainTitle}</h4>
+                
+                {/* Show service booking details if no room */}
+                {!roomType && booking.bookingType === 'service' && (
+                  <div className="mb-3 p-3 bg-purple-50 rounded-lg border border-purple-100">
+                    <div className="flex items-center gap-2 text-purple-700 mb-1">
+                      <Sparkles className="w-4 h-4" />
+                      <span className="text-sm font-medium">Service Booking</span>
+                    </div>
+                    <p className="text-xs text-purple-600">
+                      {bookingServices.length > 0 
+                        ? bookingServices.map(s => s.name).join(', ')
+                        : 'Premium service package'
+                      }
+                    </p>
+                    {booking.specialRequests && (
+                      <p className="text-xs text-slate-600 mt-2 italic">
+                        Note: {booking.specialRequests}
+                      </p>
+                    )}
+                  </div>
+                )}
 
                 <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-2 shadow-sm">
                   <div className="flex justify-between text-sm">
