@@ -412,8 +412,8 @@ export default function AdminPage() {
               <SheetContent side="left" className="p-0 w-64 border-r-0">
                 <SidebarContent />
               </SheetContent>
-          </Sheet>
-        </header>
+            </Sheet>
+          </header>
 
         {/* Content Wrapper */}
         <div className="flex-1 p-4 md:p-8 max-w-7xl mx-auto w-full space-y-8">
