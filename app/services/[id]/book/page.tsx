@@ -80,9 +80,9 @@ export default function ServiceBookingPage() {
 
   if (loading || loadingService) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background">
+      <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background flex flex-col">
         <PremiumNavbar />
-        <main className="container mx-auto px-4 py-8" style={{ marginTop: "112px" }}>
+        <main className="flex-1 container mx-auto px-4 py-8" style={{ marginTop: "112px" }}>
           <Loading message="Loading service..." variant="content" />
         </main>
         <PremiumFooter />
@@ -92,9 +92,9 @@ export default function ServiceBookingPage() {
 
   if (!service) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background">
+      <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background flex flex-col">
         <PremiumNavbar />
-        <main className="container mx-auto px-4 py-8" style={{ marginTop: "112px" }}>
+        <main className="flex-1 container mx-auto px-4 py-8" style={{ marginTop: "112px" }}>
           <div className="text-center py-12">
             <p className="text-muted-foreground">Service not found</p>
           </div>
@@ -105,9 +105,9 @@ export default function ServiceBookingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background">
+    <div className="min-h-screen bg-gradient-to-br from-background via-accent/5 to-background flex flex-col">
       <PremiumNavbar />
-      <main className="container mx-auto px-4 py-8" style={{ marginTop: "112px" }}>
+      <main className="flex-1 container mx-auto px-4 py-8" style={{ marginTop: "112px" }}>
         <ServiceBookingForm service={service} onBack={() => router.push("/services")} />
       </main>
       <PremiumFooter />
