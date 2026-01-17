@@ -172,7 +172,7 @@ export default function UserHomePage() {
         {/* Welcome Section */}
         <div className="mb-12 glass-banner border-0 p-8 rounded-2xl animate-fade-in-up">
           <h1 className="text-4xl md:text-5xl font-display font-bold mb-4 text-balance text-slate-900">
-            Welcome back, <span className="info-badge">{user.fullName || user.email}</span>
+            Welcome back, <span className="info-badge">{user.fullName || user.email.split('@')[0]}</span>
           </h1>
           <p className="text-xl text-muted-foreground text-pretty">
             Manage your bookings and explore our luxury accommodations
