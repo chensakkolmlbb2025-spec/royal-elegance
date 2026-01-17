@@ -174,13 +174,24 @@ export function ServiceBookingForm({ service, onBack }: ServiceBookingFormProps)
       <div className="lg:col-span-2">
         <Card className="glass-card">
           <CardHeader>
-            <div className="flex items-center gap-4 mb-4">
-              <Button variant="ghost" size="icon" onClick={onBack}>
+            <div className="flex items-start gap-4 mb-4">
+              <Button variant="ghost" size="icon" onClick={onBack} className="mt-1">
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              <div>
-                <CardTitle className="font-display">Book {service.name}</CardTitle>
-                <CardDescription>Fill in the details below to reserve this service</CardDescription>
+              <div className="flex-1">
+                <CardTitle className="font-display text-2xl mb-2">Book {service.name}</CardTitle>
+                <CardDescription className="text-base">
+                  {service.description || "Fill in the details below to reserve this service"}
+                </CardDescription>
+                <div className="flex items-center gap-4 mt-3">
+                  <Badge variant="outline" className="capitalize">
+                    {service.category}
+                  </Badge>
+                  <div className="flex items-center gap-1 text-lg font-semibold text-primary">
+                    <DollarSign className="w-5 h-5" />
+                    {service.price}
+                  </div>
+                </div>
               </div>
             </div>
           </CardHeader>
@@ -256,9 +267,14 @@ export function ServiceBookingForm({ service, onBack }: ServiceBookingFormProps)
             <CardTitle className="text-lg">Booking Summary</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <h3 className="font-semibold text-lg mb-2">{service.name}</h3>
+            <div className="space-y-3">
+              <h3 className="font-semibold text-xl">{service.name}</h3>
               <Badge className="capitalize">{service.category}</Badge>
+              {service.description && (
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  {service.description}
+                </p>
+              )}
             </div>
 
             <Separator />
