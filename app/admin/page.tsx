@@ -120,8 +120,9 @@ const useAdminData = (user: SupabaseUser | null) => {
     const totalRevenue = bookings
       .filter((b) => b.status !== "cancelled")
       .reduce((sum, b) => sum + b.totalPrice, 0)
+    // Occupancy includes both reserved (confirmed bookings) and occupied (checked-in) rooms
     const occupancyRate = rooms.length > 0 
-      ? Math.round((rooms.filter((r) => r.status === "occupied").length / rooms.length) * 100) 
+      ? Math.round((rooms.filter((r) => r.status === "occupied" || r.status === "reserved").length / rooms.length) * 100) 
       : 0
     
     return { totalBookings, confirmedBookings, totalRevenue, occupancyRate }
