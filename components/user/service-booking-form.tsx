@@ -88,7 +88,6 @@ export function ServiceBookingForm({ service, onBack }: ServiceBookingFormProps)
         guestCount: guests,
         roomId: null as string | null,
         roomTypeId: null as string | null,
-        services: [service.id],
         checkInDate: formatDate(serviceDate),
         checkOutDate: addDays(serviceDate, 1),
         roomPrice: 0,
@@ -127,6 +126,24 @@ export function ServiceBookingForm({ service, onBack }: ServiceBookingFormProps)
 
       if (bookingError || !newBooking) {
         throw new Error(bookingError?.message || "Failed to create booking")
+      }
+
+      // Insert the service into booking_services junction table
+      const { error: serviceError } = await supabase
+        .from("booking_services")
+        .insert([{
+          booking_id: newBooking.id,
+          service_id: service.id,
+          quantity: 1,
+          unit_price: service.price,
+          total_price: service.price,
+          service_date: formatDate(serviceDate),
+          status: 'pending'
+        }])
+
+      if (serviceError) {
+        console.error("[Service Booking] Failed to link service:", serviceError)
+        // Continue anyway - booking was created
       }
 
       setCreatedBookingId(newBooking.id)
